@@ -50,6 +50,11 @@ function assignedTileName(unitId: string): string | undefined {
 <style lang="scss" scoped>
 @use '@/styles/variables' as *;
 
+.list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .unit {
   gap: 4px;
 

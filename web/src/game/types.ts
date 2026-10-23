@@ -1,6 +1,8 @@
 export type TilePassive =
   | { kind: 'adjacentAttackReduction'; amount: number }
   | { kind: 'garrisonRegen'; amount: number }
+  /** While standing, every living unit regains `amount` health at the end of each turn. */
+  | { kind: 'garrisonHeal'; amount: number }
   /** At the start of the defense, adds one `unitDefId` per standing tile of `perTileDefId`. */
   | { kind: 'recruitPerTile'; perTileDefId: string; unitDefId: string }
 
@@ -43,7 +45,9 @@ export interface Tile {
 
 export interface PrebuiltTile {
   defId: string
-  cell: number
+  /** Column and row on the city's grid, see `gridSizeFor`. */
+  x: number
+  y: number
   /** Starting health, defaults to the def's full health. */
   health?: number
 }
@@ -74,6 +78,8 @@ export interface Attack {
   strength: number
   /** How many extra attacks were merged into this one because there were not enough tiles. */
   merged: number
+  /** Targets a tile behind the front line, so it hits at reduced strength. */
+  deep?: boolean
 }
 
 export type CardTarget = 'tile' | 'unit' | null

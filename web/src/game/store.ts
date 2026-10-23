@@ -260,10 +260,17 @@ function applyResolution() {
   }
   state.units = state.units.filter((u) => u.health > 0)
 
-  const cityRegen = state.tiles
-    .filter((t) => t.health > 0)
-    .reduce((sum, t) => sum + (t.def.passive?.kind === 'garrisonRegen' ? t.def.passive.amount : 0), 0)
+  const standing = state.tiles.filter((t) => t.health > 0)
+  const cityRegen = standing.reduce(
+    (sum, t) => sum + (t.def.passive?.kind === 'garrisonRegen' ? t.def.passive.amount : 0),
+    0,
+  )
+  const cityHeal = standing.reduce(
+    (sum, t) => sum + (t.def.passive?.kind === 'garrisonHeal' ? t.def.passive.amount : 0),
+    0,
+  )
   for (const unit of state.units) {
+    unit.health = Math.min(unit.def.health, unit.health + cityHeal)
     if (fought.has(unit.id)) {
       const unitRegen = unit.def.passive?.kind === 'enduranceRegen' ? unit.def.passive.amount : 0
       unit.endurance = Math.min(unit.def.endurance, unit.endurance + 1 + unitRegen + cityRegen)

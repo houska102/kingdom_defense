@@ -87,14 +87,23 @@ describe('generateAttacks', () => {
     }
   })
 
-  it('spills to the next rank when the front line is full', () => {
-    const tiles = fullGrid()
-    const turn = 6 // 5 attacks, 4 front-line tiles
-    const attacks = generateAttacks(turn, tiles, createRng(4), idMaker(), 'west', GRID)
-    const ranks = attacks.map((a) => rankOf(tiles, tiles.find((t) => t.id === a.tileId)!.cell, 'west'))
-    expect(ranks.filter((r) => r === 0)).toHaveLength(4)
-    expect(ranks.filter((r) => r === 1)).toHaveLength(1)
-    expect(attacks.every((a) => a.merged === 0)).toBe(true)
+  it('never has more attacks than the grid is wide', () => {
+    expect(attackCount(20, 4)).toBe(4)
+    expect(attackCount(20, 6)).toBe(6)
+    expect(attackCount(1, 6)).toBe(2)
+    const attacks = generateAttacks(20, fullGrid(), createRng(4), idMaker(), 'west', GRID)
+    expect(attacks).toHaveLength(GRID)
+    expect(attacks.every((a) => a.merged === 0 && !a.deep)).toBe(true)
+  })
+
+  it('never reaches deeper ranks once attacks are capped at grid width', () => {
+    const rng = createRng(11)
+    for (let layout = 0; layout < 300; layout++) {
+      const tiles = fullGrid().filter(() => rng.next() < 0.7)
+      for (const attack of generateAttacks(20, tiles, rng, idMaker(), 'north', GRID)) {
+        expect(attack.deep).toBe(false)
+      }
+    }
   })
 
   it('merges extra attacks onto living tiles when attacks outnumber tiles', () => {
@@ -106,7 +115,7 @@ describe('generateAttacks', () => {
     expect(attacks).toHaveLength(2)
     expect(attacks.some((a) => a.tileId === 'tile-0')).toBe(false)
     const mergedTotal = attacks.reduce((sum, a) => sum + a.merged, 0)
-    expect(mergedTotal).toBe(attackCount(turn) - 2)
+    expect(mergedTotal).toBe(attackCount(turn, GRID) - 2)
   })
 
   it('returns no attacks when the city has no living tiles', () => {

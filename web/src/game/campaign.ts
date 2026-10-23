@@ -6,7 +6,7 @@ import {
   DEFAULT_PALETTE,
   FIXED_ATTACK_DIRECTION,
   GARRISON_PICK_RATIO,
-  GRID_SIZE,
+  GRID_SIZES,
   MIN_GARRISON_PICKS,
   UNIT_DEFS,
 } from './data'
@@ -15,6 +15,12 @@ import type { Rng } from './rng'
 import type { CampaignProgress, Card, CityConfig, GameState, Tile, UnitDef } from './types'
 
 export const cityConfig = (cityIndex: number): CityConfig => CITY_CONFIGS[cityIndex]
+
+/** 4x4 in the first third of the campaign, 5x5 in the second, 6x6 in the last. */
+export function gridSizeFor(cityIndex: number): number {
+  const third = Math.floor((cityIndex * GRID_SIZES.length) / CITY_CONFIGS.length)
+  return GRID_SIZES[Math.min(third, GRID_SIZES.length - 1)]
+}
 
 export const isLastCity = (cityIndex: number) => cityIndex >= CITY_CONFIGS.length - 1
 
@@ -70,7 +76,7 @@ export function createCity(progress: CampaignProgress, nextId: number, rng: Rng)
     ...progress,
     phase: 'setup',
     turn: 0,
-    gridSize: GRID_SIZE,
+    gridSize: gridSizeFor(progress.cityIndex),
     attackDirection: FIXED_ATTACK_DIRECTION ?? rng.pick(DIRECTIONS),
     nextId,
     tiles: [],
@@ -90,7 +96,7 @@ export function createCity(progress: CampaignProgress, nextId: number, rng: Rng)
     fallReason: null,
   }
   for (const p of config.prebuilt) {
-    const tile = createTile(state, ALL_TILE_DEFS[p.defId], p.cell)
+    const tile = createTile(state, ALL_TILE_DEFS[p.defId], p.y * state.gridSize + p.x)
     tile.health = p.health ?? tile.def.health
     tile.prebuilt = true
     state.tiles.push(tile)

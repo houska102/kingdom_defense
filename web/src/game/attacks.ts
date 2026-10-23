@@ -3,8 +3,12 @@ import type { Attack, Direction, Tile } from './types'
 
 export const DIRECTIONS: Direction[] = ['north', 'east', 'south', 'west']
 
-export function attackCount(turn: number): number {
-  return 2 + Math.floor(turn / 2)
+/** Attacks on tiles behind the front line (rank > 0) hit at this fraction of their strength. */
+export const DEEP_ATTACK_FACTOR = 0.5
+
+/** Attacks per turn, never more than the width of the grid. */
+export function attackCount(turn: number, gridSize = Infinity): number {
+  return Math.min(2 + Math.floor(turn / 2), gridSize)
 }
 
 export function baseAttackStrength(turn: number, bonus = 0): number {
@@ -125,7 +129,7 @@ export function generateAttacks(
 
   const rollStrength = () =>
     Math.max(1, Math.round(baseAttackStrength(turn, bonus) + rng.int(-1, 1)))
-  const count = attackCount(turn)
+  const count = attackCount(turn, gridSize)
 
   const reachable = reachableOpenCells(tiles, direction, gridSize)
   const byRank = new Map<number, Tile[]>()
@@ -135,19 +139,25 @@ export function generateAttacks(
   }
   const ordered = [...byRank.keys()]
     .sort((a, b) => a - b)
-    .flatMap((rank) => rng.shuffle(byRank.get(rank) ?? []))
+    .flatMap((rank) => rng.shuffle(byRank.get(rank) ?? []).map((tile) => ({ tile, rank })))
   const targets = ordered.slice(0, Math.min(count, alive.length))
 
-  const attacks: Attack[] = targets.map((tile) => ({
+  const strengthFor = (deep: boolean) => {
+    const strength = rollStrength()
+    return deep ? Math.ceil(strength * DEEP_ATTACK_FACTOR) : strength
+  }
+
+  const attacks: Attack[] = targets.map(({ tile, rank }) => ({
     id: makeId(),
     tileId: tile.id,
-    strength: rollStrength(),
+    strength: strengthFor(rank > 0),
     merged: 0,
+    deep: rank > 0,
   }))
 
   for (let i = attacks.length; i < count; i++) {
     const target = rng.pick(attacks)
-    target.strength += rollStrength()
+    target.strength += strengthFor(!!target.deep)
     target.merged++
   }
   return attacks

@@ -36,13 +36,14 @@ Game loop:
 
 Decisions made (first prototype - single city):
 
-- city grid is 4x4 (max 16 tiles)
+- city grid grows over the campaign: 4x4 in the first third (cities 1-4), 5x5 in the second (5-7), 6x6 in the last (8-10)
+    - prebuilt tiles are placed by x/y on that city's grid
 - default buildings: Keep, Wall x3, House x4, Watchtower x2, Barracks
 - default garrison: choose 3 of 5 (Militia, Spearmen, Knights, Archers, Veterans)
     - each unit has strength, health, endurance and maybe a passive
 - combat order: passives reduce attack -> tile defense -> garrison strength -> tile health
     - multiple garrisons on one attack split the absorbed damage by strength ratio (rounded to whole numbers)
-- attacks per turn: 2 + turn/2 (rounded down)
+- attacks per turn: 2 + turn/2 (rounded down), never more than the grid width (4x4 = 4, 5x5 = 5, 6x6 = 6)
 - attack strength grows every turn (~3 + turn*1.5 with random spread) so destruction can't be stalled forever
 - attacks target living tiles from the enemy side (see attack direction below), extra attacks merge onto already attacked tiles (marked as stronger)
 - garrison that rested this turn gets full endurance back, garrison that fought gets 1 back
@@ -67,6 +68,8 @@ Attack direction:
     - the red marker shows on every exposed side of the tile
     - holes fully enclosed by standing tiles dont expose anything
 - attacks hit the front line first, if there are more attacks than front line tiles the rest go to rank 1, then rank 2...
+    - attacks on deeper ranks (rank 1+) are half strength (rounded up), marked with ½
+        - NOTE: with attacks capped at the grid width this currently never happens, the front line always has enough tiles
     - when front tiles get destroyed the next ones become the front line, so the city gets eaten from that side
 - merging only happens when there are more attacks than standing tiles in the whole city
 
@@ -107,6 +110,7 @@ Campaign (10 cities):
 - unlockable tiles: Bastion, Infirmary, Stockade, Ballista Tower, Militia Center
     - Militia Center (2 def, 4 HP): at the start of the defense adds 1 Militia to the garrison for each standing House
         - recruits dont count against the garrison picks
+    - Infirmary (1 def, 4 HP): while standing all garrison heals 1 HP at the end of each turn
     - unique tiles (Infirmary, Militia Center) can only be unlocked once, max 1 in the palette
         - once unlocked (or picked earlier in the same city) they stop being offered
 - unlockable units: Crossbowmen, Paladins, Longbowmen, Wardens

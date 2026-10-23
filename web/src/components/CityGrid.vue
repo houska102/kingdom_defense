@@ -75,7 +75,10 @@ function isActive(c: (typeof cells.value)[number]): boolean {
 </script>
 
 <template>
-  <div class="battlefield" :class="`from-${state.attackDirection}`">
+  <div
+    class="battlefield"
+    :class="[`from-${state.attackDirection}`, { dense: state.gridSize >= 5 }]"
+  >
     <div class="banner">
       <span class="arrows">
         {{ ARROWS[state.attackDirection] }} {{ ARROWS[state.attackDirection] }}
@@ -122,6 +125,7 @@ function isActive(c: (typeof cells.value)[number]): boolean {
           <span v-if="c.attack" class="attack-badge" :class="{ merged: c.attack.merged > 0 }">
             ATK {{ c.attack.strength }}
             <template v-if="c.attack.merged > 0"> x{{ c.attack.merged + 1 }}</template>
+            <template v-if="c.attack.deep"> ½</template>
           </span>
           <span v-if="c.attack && c.reduction > 0" class="reduction">-{{ c.reduction }} tower</span>
           <span
@@ -129,7 +133,10 @@ function isActive(c: (typeof cells.value)[number]): boolean {
             class="defenders-badge"
             :title="c.defenders.map((u) => u.def.name).join(', ')"
           >
-            {{ c.defenders.length }} {{ c.defenders.length === 1 ? 'defender' : 'defenders' }}
+            <template v-if="state.gridSize >= 5">{{ c.defenders.length }} def</template>
+            <template v-else>
+              {{ c.defenders.length }} {{ c.defenders.length === 1 ? 'defender' : 'defenders' }}
+            </template>
           </span>
         </template>
       </button>
@@ -140,7 +147,8 @@ function isActive(c: (typeof cells.value)[number]): boolean {
 <style lang="scss" scoped>
 @use '@/styles/variables' as *;
 
-$grid-width: 600px;
+/* --board-width is set by the page layout and grows with the grid size. */
+$grid-width: var(--board-width, 600px);
 $side-banner-width: 48px;
 
 .battlefield {
@@ -168,7 +176,7 @@ $side-banner-width: 48px;
 
   &.from-west,
   &.from-east {
-    width: min(100%, $grid-width + $side-banner-width);
+    width: min(100%, calc(#{$grid-width} + #{$side-banner-width}));
   }
 
   &.from-west .banner,
@@ -298,6 +306,42 @@ $side-banner-width: 48px;
     right: 6px;
     font-size: 10px;
     color: $color-accent;
+  }
+}
+
+.battlefield.dense {
+  .city-grid {
+    gap: 6px;
+  }
+
+  .cell {
+    gap: 3px;
+    padding: 6px;
+    font-size: 13px;
+  }
+
+  .defense {
+    font-size: 11px;
+  }
+
+  .attack-badge {
+    top: 4px;
+    right: 4px;
+    padding: 1px 4px;
+    font-size: 11px;
+  }
+
+  .defenders-badge,
+  .prebuilt-badge {
+    top: 4px;
+    left: 4px;
+    padding: 1px 4px;
+    font-size: 10px;
+  }
+
+  .reduction {
+    top: 24px;
+    right: 4px;
   }
 }
 </style>

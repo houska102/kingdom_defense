@@ -1,6 +1,7 @@
 import type { CityConfig, Direction, TileDef, UnitDef } from './types'
 
-export const GRID_SIZE = 4
+/** City grid size for each third of the campaign. */
+export const GRID_SIZES = [4, 5, 6]
 /** Every city is attacked from this side. Set to null to roll a random side per city. */
 export const FIXED_ATTACK_DIRECTION: Direction | null = 'north'
 export const MIN_GARRISON_PICKS = 3
@@ -116,8 +117,8 @@ export const UNLOCKABLE_TILES: TileDef[] = [
     defense: 1,
     health: 4,
     unique: true,
-    passive: { kind: 'garrisonRegen', amount: 1 },
-    description: 'While standing, all garrison regains +1 endurance per turn.',
+    passive: { kind: 'garrisonHeal', amount: 1 },
+    description: 'While standing, all garrison heals 1 health per turn.',
   },
   {
     id: 'stockade',
@@ -195,75 +196,78 @@ export const ALL_UNIT_DEFS: Record<string, UnitDef> = {
 
 /** One entry per city in campaign order. Prebuilt tiles are leftovers from earlier fighting. */
 export const CITY_CONFIGS: CityConfig[] = [
+  // 4x4
   { name: 'Ashford', attackBonus: 0, prebuilt: [] },
   { name: 'Brightwater', attackBonus: 0.5, prebuilt: [] },
-  { name: 'Coldharbour', attackBonus: 1, prebuilt: [{ defId: 'house', cell: 5, health: 2 }] },
+  { name: 'Coldharbour', attackBonus: 1, prebuilt: [{ defId: 'house', x: 1, y: 1, health: 2 }] },
   {
     name: 'Dunmere',
     attackBonus: 1.5,
     prebuilt: [
-      { defId: 'wall', cell: 0 },
-      { defId: 'house', cell: 15, health: 2 },
+      { defId: 'wall', x: 0, y: 0 },
+      { defId: 'house', x: 3, y: 3, health: 2 },
     ],
   },
+  // 5x5
   {
     name: 'Eastmarch',
     attackBonus: 2,
     prebuilt: [
-      { defId: 'wall', cell: 0 },
-      { defId: 'wall', cell: 3 },
-      { defId: 'house', cell: 10, health: 3 },
+      { defId: 'wall', x: 0, y: 0 },
+      { defId: 'wall', x: 4, y: 0 },
+      { defId: 'house', x: 2, y: 2, health: 3 },
     ],
   },
   {
     name: 'Fallowmoor',
     attackBonus: 2.5,
     prebuilt: [
-      { defId: 'wall', cell: 0, health: 4 },
-      { defId: 'house', cell: 6 },
-      { defId: 'house', cell: 9, health: 2 },
+      { defId: 'wall', x: 0, y: 0, health: 4 },
+      { defId: 'house', x: 2, y: 1 },
+      { defId: 'house', x: 1, y: 3, health: 2 },
     ],
   },
   {
     name: 'Greyhaven',
     attackBonus: 3,
     prebuilt: [
-      { defId: 'house', cell: 5, health: 1 },
-      { defId: 'house', cell: 6, health: 2 },
-      { defId: 'house', cell: 9 },
-      { defId: 'wall', cell: 15, health: 3 },
+      { defId: 'house', x: 1, y: 1, health: 1 },
+      { defId: 'house', x: 3, y: 1, health: 2 },
+      { defId: 'house', x: 1, y: 3 },
+      { defId: 'wall', x: 4, y: 4, health: 3 },
     ],
   },
+  // 6x6
   {
     name: 'Highcrag',
     attackBonus: 3.5,
     prebuilt: [
-      { defId: 'wall', cell: 1, health: 4 },
-      { defId: 'wall', cell: 2, health: 4 },
-      { defId: 'house', cell: 13, health: 2 },
-      { defId: 'house', cell: 14, health: 2 },
+      { defId: 'wall', x: 2, y: 0, health: 4 },
+      { defId: 'wall', x: 3, y: 0, health: 4 },
+      { defId: 'house', x: 1, y: 5, health: 2 },
+      { defId: 'house', x: 4, y: 5, health: 2 },
     ],
   },
   {
     name: 'Ironvale',
     attackBonus: 4,
     prebuilt: [
-      { defId: 'house', cell: 0, health: 2 },
-      { defId: 'house', cell: 3, health: 2 },
-      { defId: 'house', cell: 12, health: 2 },
-      { defId: 'house', cell: 15, health: 2 },
-      { defId: 'watchtower', cell: 6, health: 2 },
+      { defId: 'house', x: 0, y: 0, health: 2 },
+      { defId: 'house', x: 5, y: 0, health: 2 },
+      { defId: 'house', x: 0, y: 5, health: 2 },
+      { defId: 'house', x: 5, y: 5, health: 2 },
+      { defId: 'watchtower', x: 2, y: 2, health: 2 },
     ],
   },
   {
     name: 'Kingsreach',
     attackBonus: 4.5,
     prebuilt: [
-      { defId: 'wall', cell: 5, health: 3 },
-      { defId: 'wall', cell: 10, health: 3 },
-      { defId: 'house', cell: 0, health: 1 },
-      { defId: 'house', cell: 3, health: 2 },
-      { defId: 'house', cell: 15, health: 1 },
+      { defId: 'wall', x: 2, y: 2, health: 3 },
+      { defId: 'wall', x: 3, y: 3, health: 3 },
+      { defId: 'house', x: 0, y: 0, health: 1 },
+      { defId: 'house', x: 5, y: 0, health: 2 },
+      { defId: 'house', x: 5, y: 5, health: 1 },
     ],
   },
 ]

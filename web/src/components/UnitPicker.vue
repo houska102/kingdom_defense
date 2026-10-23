@@ -28,6 +28,11 @@ import { garrisonPicks, garrisonPool, state, toggleUnit } from '@/game/store'
 <style lang="scss" scoped>
 @use '@/styles/variables' as *;
 
+.list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .item.selected {
   border-color: $color-accent;
 }

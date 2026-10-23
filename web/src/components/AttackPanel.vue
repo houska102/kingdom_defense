@@ -48,6 +48,7 @@ const rows = computed(() =>
           <span v-if="row.attack.merged > 0" class="merged">
             {{ row.attack.merged + 1 }} attacks merged
           </span>
+          <span v-if="row.attack.deep" class="deep">half strength (behind front line)</span>
         </span>
         <span v-if="row.preview" class="stats">
           <template v-if="row.preview.reduction > 0">-{{ row.preview.reduction }} passives, </template>
@@ -99,6 +100,12 @@ const rows = computed(() =>
   .strength {
     margin-left: 4px;
     color: $color-attack;
+  }
+
+  .deep {
+    margin-left: 4px;
+    font-size: 12px;
+    color: $color-muted;
   }
 
   .merged {

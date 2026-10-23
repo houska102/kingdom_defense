@@ -34,6 +34,9 @@ const kingdomUnlocks = computed(() => [
 const hasPrebuilt = computed(() => state.tiles.some((t) => t.prebuilt))
 const cityOver = computed(() => state.phase === 'cityFallen' || state.phase === 'campaignOver')
 
+const BOARD_WIDTHS: Record<number, number> = { 4: 600, 5: 690, 6: 760 }
+const boardWidth = computed(() => `${BOARD_WIDTHS[state.gridSize] ?? 600}px`)
+
 const gridHighlight = computed(() => {
   switch (state.phase) {
     case 'setup':
@@ -67,7 +70,7 @@ function onUnitClick(unitId: string) {
 </script>
 
 <template>
-  <main class="app">
+  <main class="app" :class="{ wide: !cityOver }">
     <header>
       <h1>Kingdom Defense</h1>
       <span class="turn">
@@ -76,7 +79,11 @@ function onUnitClick(unitId: string) {
       </span>
     </header>
 
-    <div class="layout">
+    <div
+      class="layout"
+      :class="{ 'with-units': !cityOver }"
+      :style="{ '--board-width': boardWidth }"
+    >
       <div class="board">
         <CityGrid :highlight="gridHighlight" @cell-click="onCellClick" />
         <p v-if="state.phase === 'setup'" class="hint">
@@ -95,26 +102,27 @@ function onUnitClick(unitId: string) {
         </p>
       </div>
 
+      <div v-if="!cityOver" class="units">
+        <UnitPicker v-if="state.phase === 'setup'" />
+        <UnitRoster
+          v-else
+          :targeting="state.phase === 'draft' && state.pendingCard?.target === 'unit'"
+          @unit-click="onUnitClick"
+        />
+      </div>
+
       <aside class="side">
         <template v-if="state.phase === 'setup'">
           <TilePalette />
-          <UnitPicker />
           <button class="btn" :disabled="!canStartCity()" @click="startCity">Defend the city</button>
         </template>
 
         <template v-else-if="state.phase === 'assign' || state.phase === 'event'">
           <AttackPanel />
-          <UnitRoster :targeting="false" @unit-click="onUnitClick" />
           <button class="btn" :disabled="state.phase !== 'assign'" @click="endTurn">End turn</button>
         </template>
 
-        <template v-else-if="state.phase === 'draft'">
-          <CardDraft />
-          <UnitRoster
-            :targeting="state.pendingCard?.target === 'unit'"
-            @unit-click="onUnitClick"
-          />
-        </template>
+        <CardDraft v-else-if="state.phase === 'draft'" />
 
         <GameOver v-else />
 
@@ -140,6 +148,10 @@ function onUnitClick(unitId: string) {
   max-width: 1200px;
   margin: 0 auto;
   padding: $spacing * 4;
+
+  &.wide {
+    max-width: 1700px;
+  }
 }
 
 header {
@@ -164,6 +176,56 @@ header {
 
   @media (max-width: 900px) {
     grid-template-columns: 1fr;
+  }
+}
+
+.layout.with-units {
+  grid-template-columns: minmax(0, 1fr) minmax(0, calc(var(--board-width) + 48px)) 380px;
+  align-items: start;
+
+  .units {
+    grid-row: 1;
+    grid-column: 1;
+  }
+
+  .board {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .side {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  @media (max-width: 1350px) {
+    grid-template-columns: minmax(0, 1fr) 380px;
+
+    .board {
+      grid-row: 1;
+      grid-column: 1;
+    }
+
+    .units {
+      grid-row: 2;
+      grid-column: 1;
+    }
+
+    .side {
+      grid-row: 1 / span 2;
+      grid-column: 2;
+    }
+  }
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+
+    .units,
+    .board,
+    .side {
+      grid-column: auto;
+      grid-row: auto;
+    }
   }
 }
 

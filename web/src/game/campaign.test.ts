@@ -5,6 +5,7 @@ import {
   createCity,
   garrisonPicks,
   garrisonPool,
+  gridSizeFor,
   mergeUnlocks,
   newCampaign,
 } from './campaign'
@@ -123,7 +124,7 @@ describe('createCity', () => {
     expect(city.tiles).toHaveLength(config.prebuilt.length)
     city.tiles.forEach((tile, i) => {
       expect(tile.prebuilt).toBe(true)
-      expect(tile.cell).toBe(config.prebuilt[i].cell)
+      expect(tile.cell).toBe(config.prebuilt[i].y * city.gridSize + config.prebuilt[i].x)
       expect(tile.health).toBe(config.prebuilt[i].health ?? tile.def.health)
     })
   })
@@ -138,9 +139,20 @@ describe('createCity', () => {
       )
       const cells = city.tiles.map((t) => t.cell)
       expect(new Set(cells).size).toBe(cells.length)
+      for (const p of CITY_CONFIGS[cityIndex].prebuilt) {
+        expect(p.x).toBeGreaterThanOrEqual(0)
+        expect(p.y).toBeGreaterThanOrEqual(0)
+        expect(p.x).toBeLessThan(city.gridSize)
+        expect(p.y).toBeLessThan(city.gridSize)
+      }
       expect(cells.every((c) => c >= 0 && c < city.gridSize ** 2)).toBe(true)
       expect(city.tiles.every((t) => t.def !== undefined)).toBe(true)
     })
+  })
+
+  it('grows the grid each third of the campaign', () => {
+    const sizes = CITY_CONFIGS.map((_, i) => gridSizeFor(i))
+    expect(sizes).toEqual([4, 4, 4, 4, 5, 5, 5, 6, 6, 6])
   })
 
   it('starts a new campaign at city 1 with no unlocks', () => {
