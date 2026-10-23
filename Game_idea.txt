@@ -1,0 +1,84 @@
+- game about defending a kingdom 1 city at a time
+- the city gets gradually destroyed in turns depeding on how well yure doing at the defence.\
+    - there is no way to stall the destruction indefinitelly
+- while defending a city, make descisions that will let you defend the next one better.
+- 3 descicions at the start of the game.
+
+
+Game loop:
+
+1. make initial 3 decisions
+2. depeding on the descicions a few new city tiles and defenders get added to your city building choices.
+    - there are some default buildings and garrison to be placed as well
+3. start a city
+    - layout the city tiles and choose your garrison
+    - later cities might have some prebuild tiles
+    - there is a tile limit set by the grid of the city
+4. city loop:
+    1. multiple attacks get initiaded to different tiles
+        - when there is less tiles than attacks some tiles will get much stronger attacks to indicate this
+    2. player chooses what garrison to send to what attack
+    4. this will get the final attack and defense values:
+        - attack: Enemy attack with possible reductions from whatever tile and garrison passives
+        - defense: Tile defense + Garrison strength
+            - however much garrison strength gets used to defend the attack gets deducted first from garrison endurance and then its health
+                - example with tile (defense 2, health 8) and garrison (strength 3, health 2, endurance 2)
+                    - attack strength 2 - gets cancelled out by tile defense alone
+                    - attack strength 4 - 2 gets canceled by defense, 2 by garrison strength so remove 2 endurance
+                    - attack strength 5 - 2 gets canceled by defense, 3 by garrison strength so remove 2 endurance and 1 health
+                    - attack strength 10 - 2 gets canceled by defense, 3 by garrison strength so remove 2 endurance and 1 health remaining 5 gets removed from tile health
+                - if there are more than 1 garisons in assigned to the tile the endurance and health gets substracted by their attack ratio
+    5. Make a choice
+   ----- repat
+---- repeat until all cities are destroyed
+-get pernament point to spend
+
+
+Decisions made (first prototype - single city):
+
+- city grid is 4x4 (max 16 tiles)
+- default buildings: Keep, Wall x3, House x4, Watchtower x2, Barracks
+- default garrison: choose 3 of 5 (Militia, Spearmen, Knights, Archers, Veterans)
+    - each unit has strength, health, endurance and maybe a passive
+- combat order: passives reduce attack -> tile defense -> garrison strength -> tile health
+    - multiple garrisons on one attack split the absorbed damage by strength ratio (rounded to whole numbers)
+- attacks per turn: 2 + turn/2 (rounded down)
+- attack strength grows every turn (~3 + turn*1.5 with random spread) so destruction can't be stalled forever
+- attacks target living tiles from the enemy side (see attack direction below), extra attacks merge onto already attacked tiles (marked as stronger)
+- garrison that rested this turn gets full endurance back, garrison that fought gets 1 back
+- garrison at 0 health dies, tile at 0 health is destroyed
+- city falls when the Keep is destroyed or no tiles are left
+- "Make a choice" = pick 1 of 3 cards each turn
+    - now cards: repair tile, rest garrison, recruit garrison, fortify tile (+1 defense this turn)
+    - next city cards: unlock a new tile or garrison type for the next city
+- score for now = turns survived
+
+Attack direction:
+
+- every city has 1 enemy side (north / east / south / west), rolled at random and shown while building the city
+    - stays the same for the whole city
+- lane = column (north/south) or row (east/west)
+- rank = how many standing tiles are between the tile and the enemy edge in its lane
+    - rank 0 = front line, marked red on the enemy side of the tile
+    - empty cells and destroyed tiles dont count, gaps dont protect anything
+- attacks hit the front line first, if there are more attacks than front line tiles the rest go to rank 1, then rank 2...
+    - when front tiles get destroyed the next ones become the front line, so the city gets eaten from that side
+- merging only happens when there are more attacks than standing tiles in the whole city
+
+Events:
+
+- 20% chance per attack to trigger an event, rolled after pressing End turn (player cant react to them)
+    - only attacks with at least 1 assigned defender can get an event
+- 70% of events are good, 30% bad
+- events pop up as a modal one by one with some spice text and before -> after numbers, then the turn resolves
+- each event only affects its own attack
+- bad events:
+    - Siege Ladders - attack +3
+    - Berserker Charge - attack x1.5 (rounded up)
+    - Sappers - tile defense ignored
+    - Exhausted Defenders - each defender -1 strength
+- good events:
+    - Boiling Oil - tile defense +2
+    - Commander Slain - attack halved (rounded down)
+    - Mud and Rain - attack -3
+    - Rallying Cry - each defender +1 strength

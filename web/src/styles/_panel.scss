@@ -1,0 +1,83 @@
+@use 'variables' as *;
+
+.panel {
+  padding: $spacing * 2;
+  border-radius: $radius;
+  background: $color-surface;
+
+  h2 {
+    margin: 0 0 $spacing;
+    font-size: 16px;
+    color: $color-accent;
+  }
+
+  .hint {
+    margin: 0 0 $spacing;
+    font-size: 13px;
+    color: $color-muted;
+  }
+}
+
+.btn {
+  padding: $spacing $spacing * 2;
+  border: none;
+  border-radius: $radius;
+  background: $color-accent;
+  color: $color-bg;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &.secondary {
+    background: $color-surface-raised;
+    color: $color-text;
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: $spacing;
+  border: 2px solid $color-border;
+  border-radius: $radius;
+  background: $color-surface-raised;
+  color: $color-text;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .title {
+    font-weight: 600;
+  }
+
+  .count {
+    color: $color-muted;
+    font-weight: 400;
+  }
+
+  .stats {
+    font-size: 12px;
+    color: $color-muted;
+  }
+
+  .desc {
+    font-size: 12px;
+  }
+}
