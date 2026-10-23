@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { EVENT_DEFS, eventModifiers, rollEvents } from './events'
+import { ALL_TILE_DEFS } from './data'
+import { createTile } from './entities'
+import {
+  EVENT_DEFS,
+  GOOD_EVENT_CHANCE,
+  eventModifiers,
+  goodEventChance,
+  rollEvents,
+} from './events'
 import { createRng } from './rng'
 import type { Attack, GameEvent } from './types'
 
@@ -34,6 +42,24 @@ describe('rollEvents', () => {
     const ratio = rollEvents(attacks(5000), createRng(6)).length / 5000
     expect(ratio).toBeGreaterThan(0.17)
     expect(ratio).toBeLessThan(0.23)
+  })
+})
+
+describe('goodEventChance', () => {
+  const build = (defIds: string[]) => {
+    const ids = { nextId: 0 }
+    return defIds.map((id, cell) => createTile(ids, ALL_TILE_DEFS[id], cell))
+  }
+
+  it('is the default without a Chapel', () => {
+    expect(goodEventChance(build(['keep', 'house']))).toBe(GOOD_EVENT_CHANCE)
+  })
+
+  it('is raised by a standing Chapel only', () => {
+    const tiles = build(['keep', 'chapel'])
+    expect(goodEventChance(tiles)).toBeCloseTo(GOOD_EVENT_CHANCE + 0.1)
+    tiles[1].health = 0
+    expect(goodEventChance(tiles)).toBe(GOOD_EVENT_CHANCE)
   })
 })
 

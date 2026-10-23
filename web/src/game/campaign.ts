@@ -10,7 +10,7 @@ import {
   MIN_GARRISON_PICKS,
   UNIT_DEFS,
 } from './data'
-import { createTile } from './entities'
+import { createTile, tilePassives } from './entities'
 import type { Rng } from './rng'
 import type { CampaignProgress, Card, CityConfig, GameState, Tile, UnitDef } from './types'
 
@@ -61,12 +61,12 @@ export function mergeUnlocks(
 /** Extra units granted by `recruitPerTile` passives of standing tiles at the start of the defense. */
 export function bonusRecruits(tiles: Tile[]): UnitDef[] {
   const standing = tiles.filter((t) => t.health > 0)
-  return standing.flatMap((tile) => {
-    const passive = tile.def.passive
-    if (passive?.kind !== 'recruitPerTile') return []
-    const count = standing.filter((t) => t.def.id === passive.perTileDefId).length
-    return Array.from({ length: count }, () => ALL_UNIT_DEFS[passive.unitDefId])
-  })
+  return standing.flatMap((tile) =>
+    tilePassives(tile, 'recruitPerTile').flatMap((passive) => {
+      const count = standing.filter((t) => t.def.id === passive.perTileDefId).length
+      return Array.from({ length: count }, () => ALL_UNIT_DEFS[passive.unitDefId])
+    }),
+  )
 }
 
 /** Fresh state for the city at `progress.cityIndex`, keeping campaign progress. */
@@ -105,5 +105,9 @@ export function createCity(progress: CampaignProgress, nextId: number, rng: Rng)
 }
 
 export function newCampaign(rng: Rng): GameState {
-  return createCity({ cityIndex: 0, cityResults: [], tileUnlocks: {}, unitUnlocks: [] }, 0, rng)
+  return createCity(
+    { cityIndex: 0, cityResults: [], tileUnlocks: {}, unitUnlocks: [], gold: 0 },
+    0,
+    rng,
+  )
 }

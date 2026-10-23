@@ -104,9 +104,10 @@ describe('createCity', () => {
   it('carries unlocks into the next city and resets the rest', () => {
     const rng = createRng(1)
     const unlocks = mergeUnlocks({ tileUnlocks: {}, unitUnlocks: [] }, [tileCard(0), unitCard(1)])
-    const city = createCity({ cityIndex: 1, cityResults: [], ...unlocks }, 42, rng)
+    const city = createCity({ cityIndex: 1, cityResults: [], ...unlocks, gold: 5 }, 42, rng)
 
     expect(city.phase).toBe('setup')
+    expect(city.gold).toBe(5)
     expect(city.unlocks).toEqual([])
     expect(city.palette[UNLOCKABLE_TILES[0].id]).toBe(1)
     expect(garrisonPool(city.unitUnlocks).map((u) => u.id)).toContain(UNLOCKABLE_UNITS[1].id)
@@ -117,7 +118,7 @@ describe('createCity', () => {
     const index = CITY_CONFIGS.findIndex((c) => c.prebuilt.length > 0)
     const config = CITY_CONFIGS[index]
     const city = createCity(
-      { cityIndex: index, cityResults: [], tileUnlocks: {}, unitUnlocks: [] },
+      { cityIndex: index, cityResults: [], tileUnlocks: {}, unitUnlocks: [], gold: 0 },
       0,
       createRng(2),
     )
@@ -133,7 +134,7 @@ describe('createCity', () => {
     expect(CITY_CONFIGS).toHaveLength(10)
     CITY_CONFIGS.forEach((_, cityIndex) => {
       const city = createCity(
-        { cityIndex, cityResults: [], tileUnlocks: {}, unitUnlocks: [] },
+        { cityIndex, cityResults: [], tileUnlocks: {}, unitUnlocks: [], gold: 0 },
         0,
         createRng(cityIndex),
       )
@@ -160,5 +161,6 @@ describe('createCity', () => {
     expect(state.cityIndex).toBe(0)
     expect(state.tileUnlocks).toEqual({})
     expect(state.unitUnlocks).toEqual([])
+    expect(state.gold).toBe(0)
   })
 })

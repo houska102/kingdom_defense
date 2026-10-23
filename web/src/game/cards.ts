@@ -1,8 +1,8 @@
 import { garrisonPool, isLastCity } from './campaign'
 import { UNLOCKABLE_TILES, UNLOCKABLE_UNITS } from './data'
-import { createUnit, nextId } from './entities'
+import { createUnit, nextId, passiveTotal } from './entities'
 import type { Rng } from './rng'
-import type { Card, GameState, TileDef, UnitDef } from './types'
+import type { Card, GameState, Tile, TileDef, UnitDef } from './types'
 
 export type DraftState = Pick<
   GameState,
@@ -113,7 +113,14 @@ const TEMPLATES: CardTemplate[] = [
   },
 ]
 
-export function rollDraft(state: DraftState, rng: Rng, size = 3): Card[] {
+export const DRAFT_SIZE = 3
+
+/** Cards offered per draft, raised by `draftBonus` passives of standing tiles. */
+export function draftSize(tiles: Tile[]): number {
+  return DRAFT_SIZE + passiveTotal(tiles, 'draftBonus')
+}
+
+export function rollDraft(state: DraftState, rng: Rng, size = DRAFT_SIZE): Card[] {
   const lastCity = isLastCity(state.cityIndex)
   const templates = TEMPLATES.filter(
     (t) => !(t.nextCity && lastCity) && (t.available?.(state) ?? true),

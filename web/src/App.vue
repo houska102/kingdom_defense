@@ -6,6 +6,7 @@ import CityGrid from '@/components/CityGrid.vue'
 import EventModal from '@/components/EventModal.vue'
 import GameOver from '@/components/GameOver.vue'
 import TilePalette from '@/components/TilePalette.vue'
+import TreasuryPanel from '@/components/TreasuryPanel.vue'
 import TurnLog from '@/components/TurnLog.vue'
 import UnitPicker from '@/components/UnitPicker.vue'
 import UnitRoster from '@/components/UnitRoster.vue'
@@ -77,6 +78,7 @@ function onUnitClick(unitId: string) {
         City {{ state.cityIndex + 1 }} / {{ CAMPAIGN_LENGTH }}: {{ currentCity().name }}
         <template v-if="state.phase !== 'setup'"> - Turn {{ state.turn }}</template>
       </span>
+      <span class="gold">{{ state.gold }} gold</span>
     </header>
 
     <div
@@ -118,6 +120,7 @@ function onUnitClick(unitId: string) {
         </template>
 
         <template v-else-if="state.phase === 'assign' || state.phase === 'event'">
+          <TreasuryPanel />
           <AttackPanel />
           <button class="btn" :disabled="state.phase !== 'assign'" @click="endTurn">End turn</button>
         </template>
@@ -166,6 +169,12 @@ header {
   .turn {
     font-size: 18px;
     color: $color-muted;
+  }
+
+  .gold {
+    margin-left: auto;
+    font-size: 18px;
+    color: $color-accent;
   }
 }
 

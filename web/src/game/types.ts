@@ -5,6 +5,20 @@ export type TilePassive =
   | { kind: 'garrisonHeal'; amount: number }
   /** At the start of the defense, adds one `unitDefId` per standing tile of `perTileDefId`. */
   | { kind: 'recruitPerTile'; perTileDefId: string; unitDefId: string }
+  /** Raises the chance that a triggered event is good by `amount` (0.1 = +10%). */
+  | { kind: 'goodEventBonus'; amount: number }
+  /** Can't be attacked while another standing tile shares its lane. */
+  | { kind: 'laneAnchor' }
+  /** Grants `amount` gold at the end of each turn. */
+  | { kind: 'goldIncome'; amount: number }
+  /** While standing, a random unit (locked ones included) can be hired for `cost` gold. */
+  | { kind: 'mercenaryHire'; cost: number }
+  /** While standing, the card draft offers `amount` extra cards. */
+  | { kind: 'draftBonus'; amount: number }
+
+export type TilePassiveKind = TilePassive['kind']
+/** Passive kinds that carry a numeric `amount`. */
+export type AmountPassiveKind = Extract<TilePassive, { amount: number }>['kind']
 
 export type UnitPassive =
   | { kind: 'attackReduction'; amount: number }
@@ -16,7 +30,7 @@ export interface TileDef {
   defense: number
   health: number
   description: string
-  passive?: TilePassive
+  passives?: TilePassive[]
   /** The city falls when a tile of this type is destroyed. */
   essential?: boolean
   /** Can be unlocked at most once per campaign. */
@@ -139,6 +153,8 @@ export interface CampaignProgress {
   tileUnlocks: Record<string, number>
   /** Unit def ids added to the garrison pool. */
   unitUnlocks: string[]
+  /** Campaign-wide treasury, carried between cities. */
+  gold: number
 }
 
 export interface GameState extends CampaignProgress {

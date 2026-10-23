@@ -10,11 +10,18 @@ import {
   mergeUnlocks,
   newCampaign,
 } from './campaign'
-import { applyCard, rollDraft } from './cards'
+import { applyCard, draftSize, rollDraft } from './cards'
 import { resolveAttack, type CombatResult } from './combat'
 import { ALL_TILE_DEFS, ALL_UNIT_DEFS } from './data'
-import { createTile, createUnit, isAdjacent, nextId } from './entities'
-import { eventModifiers, rollEvents } from './events'
+import {
+  createTile,
+  createUnit,
+  isAdjacent,
+  nextId,
+  passiveTotal,
+  tilePassives,
+} from './entities'
+import { EVENT_CHANCE, eventModifiers, goodEventChance, rollEvents } from './events'
 import { createRng, type Rng } from './rng'
 import type {
   Attack,
@@ -55,13 +62,26 @@ export function unitsOnAttack(attackId: string): Unit[] {
 
 /** Reduction applied to attacks on `tile` by passives of other living tiles. */
 export function cityReduction(tile: Tile): number {
-  return state.tiles
-    .filter((t) => t.health > 0 && t.id !== tile.id && isAdjacent(t.cell, tile.cell, state.gridSize))
-    .reduce(
-      (sum, t) =>
-        sum + (t.def.passive?.kind === 'adjacentAttackReduction' ? t.def.passive.amount : 0),
-      0,
-    )
+  const neighbors = state.tiles.filter(
+    (t) => t.id !== tile.id && isAdjacent(t.cell, tile.cell, state.gridSize),
+  )
+  return passiveTotal(neighbors, 'adjacentAttackReduction')
+}
+
+/** Cheapest mercenary price offered by a standing tile, or undefined if none can hire. */
+export function mercenaryCost(): number | undefined {
+  const costs = state.tiles
+    .filter((t) => t.health > 0)
+    .flatMap((t) => tilePassives(t, 'mercenaryHire'))
+    .map((p) => p.cost)
+  return costs.length ? Math.min(...costs) : undefined
+}
+
+export const goldIncome = () => passiveTotal(state.tiles, 'goldIncome')
+
+export function canHireMercenary(): boolean {
+  const cost = mercenaryCost()
+  return state.phase === 'assign' && cost !== undefined && state.gold >= cost
 }
 
 /** Sides from which the enemy can currently reach `tile`. Empty if it is shielded. */
@@ -201,6 +221,22 @@ export function assignSelectedUnit(attackId: string) {
   state.selectedUnitId = null
 }
 
+/** Adds a line to the current turn's battle log entry. */
+function logLine(line: string) {
+  const report = state.reports[0]
+  if (report?.turn === state.turn) report.lines.push(line)
+  else state.reports.unshift({ turn: state.turn, lines: [line] })
+}
+
+export function hireMercenary() {
+  const cost = mercenaryCost()
+  if (!canHireMercenary() || cost === undefined) return
+  const def = rng.pick(Object.values(ALL_UNIT_DEFS))
+  state.gold -= cost
+  state.units.push(createUnit(state, def))
+  logLine(`Hired ${def.name} for ${cost} gold.`)
+}
+
 function describeResult(result: CombatResult, tile: Tile, attack: Attack): string {
   const parts = [`${tile.def.name} hit for ${result.incoming}`]
   if (attack.merged > 0) parts[0] += ` (${attack.merged + 1} attacks merged)`
@@ -218,7 +254,7 @@ export function endTurn() {
   if (state.phase !== 'assign') return
   state.selectedUnitId = null
   const defended = state.attacks.filter((a) => (state.assignments[a.id]?.length ?? 0) > 0)
-  state.pendingEvents = rollEvents(defended, rng)
+  state.pendingEvents = rollEvents(defended, rng, EVENT_CHANCE, goodEventChance(state.tiles))
   state.eventIndex = 0
   if (state.pendingEvents.length > 0) state.phase = 'event'
   else applyResolution()
@@ -260,15 +296,13 @@ function applyResolution() {
   }
   state.units = state.units.filter((u) => u.health > 0)
 
-  const standing = state.tiles.filter((t) => t.health > 0)
-  const cityRegen = standing.reduce(
-    (sum, t) => sum + (t.def.passive?.kind === 'garrisonRegen' ? t.def.passive.amount : 0),
-    0,
-  )
-  const cityHeal = standing.reduce(
-    (sum, t) => sum + (t.def.passive?.kind === 'garrisonHeal' ? t.def.passive.amount : 0),
-    0,
-  )
+  const cityRegen = passiveTotal(state.tiles, 'garrisonRegen')
+  const cityHeal = passiveTotal(state.tiles, 'garrisonHeal')
+  const income = goldIncome()
+  if (income > 0) {
+    state.gold += income
+    lines.push(`The treasury gains ${income} gold (${state.gold} total).`)
+  }
   for (const unit of state.units) {
     unit.health = Math.min(unit.def.health, unit.health + cityHeal)
     if (fought.has(unit.id)) {
@@ -281,7 +315,7 @@ function applyResolution() {
 
   for (const tile of state.tiles) tile.bonusDefense = 0
 
-  state.reports.unshift({ turn: state.turn, lines })
+  for (const line of lines) logLine(line)
   state.attacks = []
   state.assignments = {}
   state.selectedUnitId = null
@@ -295,7 +329,7 @@ function applyResolution() {
     return
   }
 
-  state.draft = rollDraft(state, rng)
+  state.draft = rollDraft(state, rng, draftSize(state.tiles))
   state.pendingCard = null
   state.phase = 'draft'
 }
@@ -344,6 +378,7 @@ export function nextCity() {
     cityResults: state.cityResults,
     tileUnlocks: state.tileUnlocks,
     unitUnlocks: state.unitUnlocks,
+    gold: state.gold,
   }
   Object.assign(state, createCity(progress, state.nextId, rng))
 }

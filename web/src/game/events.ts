@@ -1,6 +1,7 @@
 import type { CombatModifiers } from './combat'
+import { passiveTotal } from './entities'
 import type { Rng } from './rng'
-import type { Attack, GameEvent, TriggeredEvent } from './types'
+import type { Attack, GameEvent, Tile, TriggeredEvent } from './types'
 
 export const EVENT_CHANCE = 0.2
 export const GOOD_EVENT_CHANCE = 0.7
@@ -63,6 +64,11 @@ export const EVENT_DEFS: GameEvent[] = [
     effect: { kind: 'strengthDelta', amount: 1 },
   },
 ]
+
+/** Chance that a triggered event is good, raised by `goodEventBonus` passives of standing tiles. */
+export function goodEventChance(tiles: Tile[]): number {
+  return Math.min(1, GOOD_EVENT_CHANCE + passiveTotal(tiles, 'goodEventBonus'))
+}
 
 const GOOD_EVENTS = EVENT_DEFS.filter((e) => e.good)
 const BAD_EVENTS = EVENT_DEFS.filter((e) => !e.good)

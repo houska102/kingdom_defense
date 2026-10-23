@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyCard, rollDraft } from './cards'
+import { DRAFT_SIZE, applyCard, draftSize, rollDraft } from './cards'
 import {
   ALL_TILE_DEFS,
   CAMPAIGN_LENGTH,
@@ -38,6 +38,7 @@ const makeState = (): GameState => {
     cityResults: [],
     tileUnlocks: {},
     unitUnlocks: [],
+    gold: 0,
   }
   state.tiles.push(createTile(state, TILE_DEFS.wall, 0))
   state.units.push(createUnit(state, UNIT_DEFS.militia))
@@ -74,7 +75,9 @@ describe('rollDraft', () => {
     expect(uniqueIds).toEqual(expect.arrayContaining(['infirmary', 'militiaCenter']))
 
     const state = makeState()
-    state.tileUnlocks = { infirmary: 1 }
+    state.tileUnlocks = Object.fromEntries(
+      uniqueIds.filter((id) => id !== 'militiaCenter').map((id) => [id, 1]),
+    )
     state.unlocks = [
       {
         id: 'picked',
@@ -102,6 +105,27 @@ describe('rollDraft', () => {
     for (let seed = 0; seed < 50; seed++) {
       expect(rollDraft(state, createRng(seed)).every((c) => !c.nextCity)).toBe(true)
     }
+  })
+
+  it('offers as many different cards as the draft size', () => {
+    const state = makeState()
+    for (let seed = 0; seed < 50; seed++) {
+      const draft = rollDraft(state, createRng(seed), 4)
+      expect(draft).toHaveLength(4)
+      expect(new Set(draft.map((c) => c.name)).size).toBe(4)
+    }
+  })
+})
+
+describe('draftSize', () => {
+  it('adds a card while a Granary stands', () => {
+    const ids = { nextId: 0 }
+    const wall = createTile(ids, TILE_DEFS.wall, 0)
+    const granary = createTile(ids, ALL_TILE_DEFS.granary, 1)
+    expect(draftSize([wall])).toBe(DRAFT_SIZE)
+    expect(draftSize([wall, granary])).toBe(DRAFT_SIZE + 1)
+    granary.health = 0
+    expect(draftSize([wall, granary])).toBe(DRAFT_SIZE)
   })
 })
 

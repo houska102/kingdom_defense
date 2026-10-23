@@ -6,7 +6,7 @@ import {
   frontlineRank,
   generateAttacks,
 } from './attacks'
-import { TILE_DEFS } from './data'
+import { ALL_TILE_DEFS, TILE_DEFS } from './data'
 import { createRng } from './rng'
 import type { Direction, Tile } from './types'
 
@@ -116,6 +116,32 @@ describe('generateAttacks', () => {
     expect(attacks.some((a) => a.tileId === 'tile-0')).toBe(false)
     const mergedTotal = attacks.reduce((sum, a) => sum + a.merged, 0)
     expect(mergedTotal).toBe(attackCount(turn, GRID) - 2)
+  })
+
+  describe('Last Bastion', () => {
+    const withBastion = (tiles: Tile[], cell: number) =>
+      tiles.map((t) => (t.cell === cell ? { ...t, def: ALL_TILE_DEFS.lastBastion } : t))
+
+    it('is never attacked while its lane has other standing tiles', () => {
+      const tiles = withBastion(fullGrid(), 0)
+      for (let seed = 0; seed < 50; seed++) {
+        const attacks = generateAttacks(20, tiles, createRng(seed), idMaker(), 'north', GRID)
+        expect(attacks.some((a) => a.tileId === 'tile-0')).toBe(false)
+        expect(attacks).toHaveLength(GRID)
+      }
+    })
+
+    it('is attacked once it is alone in its lane', () => {
+      const tiles = withBastion(fullGrid(), 0).filter((t) => ![4, 8, 12].includes(t.cell))
+      const attacks = generateAttacks(20, tiles, createRng(1), idMaker(), 'north', GRID)
+      expect(attacks.some((a) => a.tileId === 'tile-0')).toBe(true)
+    })
+
+    it('is still attacked when nothing else can be', () => {
+      const tiles = withBastion(withBastion(makeTiles(5), 0), 4).filter((t) => t.cell % GRID === 0)
+      const attacks = generateAttacks(20, tiles, createRng(2), idMaker(), 'north', GRID)
+      expect(attacks.length).toBeGreaterThan(0)
+    })
   })
 
   it('returns no attacks when the city has no living tiles', () => {

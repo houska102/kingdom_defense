@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { describeUnitPassive } from '@/game/entities'
 import { attackOfUnit, state, tileById } from '@/game/store'
 import StatBar from './StatBar.vue'
 
@@ -42,6 +43,9 @@ function assignedTileName(unitId: string): string | undefined {
         </span>
         <StatBar :value="unit.health" :max="unit.def.health" kind="health" />
         <StatBar :value="unit.endurance" :max="unit.def.endurance" kind="endurance" />
+        <span v-if="unit.def.passive" class="passive">
+          {{ describeUnitPassive(unit.def.passive) }}
+        </span>
       </button>
     </div>
   </section>
@@ -72,6 +76,11 @@ function assignedTileName(unitId: string): string | undefined {
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .passive {
+    font-size: 12px;
+    color: $color-accent;
   }
 
   .badge {

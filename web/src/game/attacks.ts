@@ -1,3 +1,4 @@
+import { hasPassive } from './entities'
 import type { Rng } from './rng'
 import type { Attack, Direction, Tile } from './types'
 
@@ -110,6 +111,21 @@ export function frontlineRank(
   }).length
 }
 
+/** True for a `laneAnchor` tile that still shares its lane with another standing tile. */
+export function isLaneAnchored(
+  tile: Tile,
+  tiles: Tile[],
+  direction: Direction,
+  gridSize: number,
+): boolean {
+  if (tile.health <= 0 || !hasPassive(tile, 'laneAnchor')) return false
+  const { lane } = laneAndDepth(tile.cell, direction, gridSize)
+  return tiles.some(
+    (t) =>
+      t.id !== tile.id && t.health > 0 && laneAndDepth(t.cell, direction, gridSize).lane === lane,
+  )
+}
+
 /**
  * Creates this turn's attacks, at most one per living tile, filling exposed tiles (front line
  * and open flanks) first and spilling deeper. When there are more attacks than living tiles,
@@ -124,8 +140,10 @@ export function generateAttacks(
   gridSize: number,
   bonus = 0,
 ): Attack[] {
-  const alive = tiles.filter((t) => t.health > 0)
-  if (alive.length === 0) return []
+  const standing = tiles.filter((t) => t.health > 0)
+  if (standing.length === 0) return []
+  const unshielded = standing.filter((t) => !isLaneAnchored(t, standing, direction, gridSize))
+  const alive = unshielded.length > 0 ? unshielded : standing
 
   const rollStrength = () =>
     Math.max(1, Math.round(baseAttackStrength(turn, bonus) + rng.int(-1, 1)))

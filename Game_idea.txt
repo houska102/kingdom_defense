@@ -102,17 +102,30 @@ Campaign (10 cities):
     - recruit cards can also draw unlocked units
 - garrison picks = 60% of the garrison pool (rounded down), never lower than 3
     - pool 5 -> 3 picks, 7 -> 4, 9 -> 5
-- nothing else carries over, garrison and tiles are fresh every city
+- gold also carries over (see Gold below), nothing else does, garrison and tiles are fresh every city
 - the last city offers no next city cards
 - difficulty scaling:
     - every city adds +0.5 attack strength (city 1 +0, city 10 +4.5)
     - from city 3 on some tiles are prebuilt (often damaged), they cant be removed and take grid space
-- unlockable tiles: Bastion, Infirmary, Stockade, Ballista Tower, Militia Center
+- unlockable tiles: Bastion, Infirmary, Stockade, Ballista Tower, Militia Center, Chapel, Last Bastion, Mercenary Camp, Granary
+    - a tile can have more than one passive
+    - Chapel (0 def, 4 HP): while standing, events are 80% good instead of 70%
+    - Last Bastion (4 def, 8 HP): cant be attacked while another standing tile shares its lane
+        - still blocks the lane, so tiles behind it stay shielded
+        - if nothing else can be attacked it gets attacked anyway
+    - Mercenary Camp (1 def, 4 HP): two passives
+        - gold income: +1 gold at the end of each turn
+        - mercenary hire: spend 3 gold during the assign phase to hire a random unit (locked ones included)
+    - Granary (2 def, 5 HP): if it survives the turn, the card pick shows 4 options instead of 3
     - Militia Center (2 def, 4 HP): at the start of the defense adds 1 Militia to the garrison for each standing House
         - recruits dont count against the garrison picks
     - Infirmary (1 def, 4 HP): while standing all garrison heals 1 HP at the end of each turn
-    - unique tiles (Infirmary, Militia Center) can only be unlocked once, max 1 in the palette
+    - unique tiles (Infirmary, Militia Center, Chapel, Last Bastion, Mercenary Camp, Granary) can only be unlocked once, max 1 in the palette
         - once unlocked (or picked earlier in the same city) they stop being offered
 - unlockable units: Crossbowmen, Paladins, Longbowmen, Wardens
+- Gold:
+    - campaign-wide treasury, starts at 0 and carries over between cities
+    - earned from tile passives (Mercenary Camp for now)
+    - spent on mercenaries for now, meant as a general currency for future uses (shops, upgrades, ...)
 - end of campaign: turns survived per city, total turns and permanent points
     - permanent points = total turns, not spendable yet
