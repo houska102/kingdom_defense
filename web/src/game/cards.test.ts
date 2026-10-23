@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { applyCard, rollDraft } from './cards'
-import { TILE_DEFS, UNIT_DEFS } from './data'
+import {
+  ALL_TILE_DEFS,
+  CAMPAIGN_LENGTH,
+  TILE_DEFS,
+  UNIT_DEFS,
+  UNLOCKABLE_TILES,
+  UNLOCKABLE_UNITS,
+} from './data'
 import { createTile, createUnit } from './entities'
 import { createRng } from './rng'
 import type { Card, GameState } from './types'
@@ -27,6 +34,10 @@ const makeState = (): GameState => {
     pendingCard: null,
     unlocks: [],
     fallReason: null,
+    cityIndex: 0,
+    cityResults: [],
+    tileUnlocks: {},
+    unitUnlocks: [],
   }
   state.tiles.push(createTile(state, TILE_DEFS.wall, 0))
   state.units.push(createUnit(state, UNIT_DEFS.militia))
@@ -38,6 +49,59 @@ describe('rollDraft', () => {
     const draft = rollDraft(makeState(), createRng(5))
     expect(draft).toHaveLength(3)
     expect(new Set(draft.map((c) => c.effect.kind)).size).toBe(3)
+  })
+
+  it('never offers units that are already unlocked', () => {
+    const state = makeState()
+    state.unitUnlocks = UNLOCKABLE_UNITS.slice(1).map((u) => u.id)
+    for (let seed = 0; seed < 50; seed++) {
+      for (const card of rollDraft(state, createRng(seed))) {
+        if (card.effect.kind === 'unlockUnit') {
+          expect(card.effect.unit.id).toBe(UNLOCKABLE_UNITS[0].id)
+        }
+      }
+    }
+    state.unitUnlocks = UNLOCKABLE_UNITS.map((u) => u.id)
+    for (let seed = 0; seed < 50; seed++) {
+      expect(rollDraft(state, createRng(seed)).some((c) => c.effect.kind === 'unlockUnit')).toBe(
+        false,
+      )
+    }
+  })
+
+  it('never offers unique tiles that are already unlocked or picked this city', () => {
+    const uniqueIds = UNLOCKABLE_TILES.filter((t) => t.unique).map((t) => t.id)
+    expect(uniqueIds).toEqual(expect.arrayContaining(['infirmary', 'militiaCenter']))
+
+    const state = makeState()
+    state.tileUnlocks = { infirmary: 1 }
+    state.unlocks = [
+      {
+        id: 'picked',
+        name: '',
+        description: '',
+        target: null,
+        effect: { kind: 'unlockTile', tile: ALL_TILE_DEFS.militiaCenter },
+        nextCity: true,
+      },
+    ]
+    let offeredTiles = 0
+    for (let seed = 0; seed < 200; seed++) {
+      for (const card of rollDraft(state, createRng(seed))) {
+        if (card.effect.kind !== 'unlockTile') continue
+        offeredTiles++
+        expect(uniqueIds).not.toContain(card.effect.tile.id)
+      }
+    }
+    expect(offeredTiles).toBeGreaterThan(0)
+  })
+
+  it('offers no next-city cards in the last city', () => {
+    const state = makeState()
+    state.cityIndex = CAMPAIGN_LENGTH - 1
+    for (let seed = 0; seed < 50; seed++) {
+      expect(rollDraft(state, createRng(seed)).every((c) => !c.nextCity)).toBe(true)
+    }
   })
 })
 

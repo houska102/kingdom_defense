@@ -50,17 +50,22 @@ Decisions made (first prototype - single city):
 - city falls when the Keep is destroyed or no tiles are left
 - "Make a choice" = pick 1 of 3 cards each turn
     - now cards: repair tile, rest garrison, recruit garrison, fortify tile (+1 defense this turn)
-    - next city cards: unlock a new tile or garrison type for the next city
+    - next city cards: unlock a new tile or garrison type for all later cities
 - score for now = turns survived
 
 Attack direction:
 
-- every city has 1 enemy side (north / east / south / west), rolled at random and shown while building the city
+- every city has 1 enemy side, shown while building the city
+    - for now always north (random north / east / south / west is supported, switched off for now)
     - stays the same for the whole city
 - lane = column (north/south) or row (east/west)
 - rank = how many standing tiles are between the tile and the enemy edge in its lane
     - rank 0 = front line, marked red on the enemy side of the tile
     - empty cells and destroyed tiles dont count, gaps dont protect anything
+- open flanks: the enemy can walk through empty / destroyed cells connected to its edge
+    - any tile next to such a cell is exposed from that side and counts as front line (rank 0)
+    - the red marker shows on every exposed side of the tile
+    - holes fully enclosed by standing tiles dont expose anything
 - attacks hit the front line first, if there are more attacks than front line tiles the rest go to rank 1, then rank 2...
     - when front tiles get destroyed the next ones become the front line, so the city gets eaten from that side
 - merging only happens when there are more attacks than standing tiles in the whole city
@@ -82,3 +87,28 @@ Events:
     - Commander Slain - attack halved (rounded down)
     - Mud and Rain - attack -3
     - Rallying Cry - each defender +1 strength
+
+Campaign (10 cities):
+
+- each city is played until it falls, then you march to the next one
+    - campaign ends when city 10 falls
+- cities: Ashford, Brightwater, Coldharbour, Dunmere, Eastmarch, Fallowmoor, Greyhaven, Highcrag, Ironvale, Kingsreach
+- unlocks picked in a city apply to every later city
+    - tile unlock: +1 copy of that tile in the palette, stacks if picked again
+    - unit unlock: unit is added to the garrison pool, never offered twice
+    - recruit cards can also draw unlocked units
+- garrison picks = 60% of the garrison pool (rounded down), never lower than 3
+    - pool 5 -> 3 picks, 7 -> 4, 9 -> 5
+- nothing else carries over, garrison and tiles are fresh every city
+- the last city offers no next city cards
+- difficulty scaling:
+    - every city adds +0.5 attack strength (city 1 +0, city 10 +4.5)
+    - from city 3 on some tiles are prebuilt (often damaged), they cant be removed and take grid space
+- unlockable tiles: Bastion, Infirmary, Stockade, Ballista Tower, Militia Center
+    - Militia Center (2 def, 4 HP): at the start of the defense adds 1 Militia to the garrison for each standing House
+        - recruits dont count against the garrison picks
+    - unique tiles (Infirmary, Militia Center) can only be unlocked once, max 1 in the palette
+        - once unlocked (or picked earlier in the same city) they stop being offered
+- unlockable units: Crossbowmen, Paladins, Longbowmen, Wardens
+- end of campaign: turns survived per city, total turns and permanent points
+    - permanent points = total turns, not spendable yet

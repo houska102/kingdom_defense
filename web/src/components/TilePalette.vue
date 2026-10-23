@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TILE_DEFS } from '@/game/data'
+import { ALL_TILE_DEFS as TILE_DEFS } from '@/game/data'
 import { selectTileDef, state } from '@/game/store'
 </script>
 

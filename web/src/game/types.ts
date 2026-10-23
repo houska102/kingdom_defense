@@ -1,6 +1,8 @@
 export type TilePassive =
   | { kind: 'adjacentAttackReduction'; amount: number }
   | { kind: 'garrisonRegen'; amount: number }
+  /** At the start of the defense, adds one `unitDefId` per standing tile of `perTileDefId`. */
+  | { kind: 'recruitPerTile'; perTileDefId: string; unitDefId: string }
 
 export type UnitPassive =
   | { kind: 'attackReduction'; amount: number }
@@ -15,6 +17,8 @@ export interface TileDef {
   passive?: TilePassive
   /** The city falls when a tile of this type is destroyed. */
   essential?: boolean
+  /** Can be unlocked at most once per campaign. */
+  unique?: boolean
 }
 
 export interface UnitDef {
@@ -33,6 +37,28 @@ export interface Tile {
   cell: number
   health: number
   bonusDefense: number
+  /** Placed by the city config, cannot be removed during setup. */
+  prebuilt?: boolean
+}
+
+export interface PrebuiltTile {
+  defId: string
+  cell: number
+  /** Starting health, defaults to the def's full health. */
+  health?: number
+}
+
+export interface CityConfig {
+  name: string
+  /** Flat strength added to every attack in this city. */
+  attackBonus: number
+  prebuilt: PrebuiltTile[]
+}
+
+export interface CityResult {
+  name: string
+  turns: number
+  fallReason: string
 }
 
 export interface Unit {
@@ -66,7 +92,7 @@ export interface Card {
   description: string
   target: CardTarget
   effect: CardEffect
-  /** Next-city cards are only recorded in unlocks for now. */
+  /** Next-city cards are recorded in unlocks and applied when the city falls. */
   nextCity: boolean
 }
 
@@ -92,14 +118,24 @@ export interface TriggeredEvent {
   event: GameEvent
 }
 
-export type Phase = 'setup' | 'assign' | 'event' | 'draft' | 'gameover'
+export type Phase = 'setup' | 'assign' | 'event' | 'draft' | 'cityFallen' | 'campaignOver'
 
 export interface TurnReport {
   turn: number
   lines: string[]
 }
 
-export interface GameState {
+export interface CampaignProgress {
+  /** 0-based index into CITY_CONFIGS. */
+  cityIndex: number
+  cityResults: CityResult[]
+  /** tileDefId -> extra copies added to every city's palette. */
+  tileUnlocks: Record<string, number>
+  /** Unit def ids added to the garrison pool. */
+  unitUnlocks: string[]
+}
+
+export interface GameState extends CampaignProgress {
   phase: Phase
   turn: number
   gridSize: number
@@ -120,6 +156,7 @@ export interface GameState {
   reports: TurnReport[]
   draft: Card[]
   pendingCard: Card | null
+  /** Next-city cards picked in the current city. */
   unlocks: Card[]
   fallReason: string | null
 }

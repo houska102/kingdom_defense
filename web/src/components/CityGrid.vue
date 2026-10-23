@@ -4,7 +4,8 @@ import { tileDefense } from '@/game/entities'
 import {
   attackOnTile,
   cityReduction,
-  isFrontline,
+  exposedSidesOf,
+  previewAttack,
   state,
   tileAt,
   unitsOnAttack,
@@ -18,6 +19,20 @@ const LABELS: Record<Direction, string> = {
   east: 'East',
   south: 'South',
   west: 'West',
+}
+
+const FRONT_MARKER = 5
+const MARKER_COLOR = '#e0563f'
+const MARKER_OFFSETS: Record<Direction, string> = {
+  north: `0 ${FRONT_MARKER}px`,
+  south: `0 -${FRONT_MARKER}px`,
+  west: `${FRONT_MARKER}px 0`,
+  east: `-${FRONT_MARKER}px 0`,
+}
+
+function frontMarkerShadow(sides: Direction[]): string | undefined {
+  if (sides.length === 0) return undefined
+  return sides.map((side) => `inset ${MARKER_OFFSETS[side]} 0 ${MARKER_COLOR}`).join(', ')
 }
 
 const props = defineProps<{
@@ -35,9 +50,10 @@ const cells = computed(() =>
       cell,
       tile,
       attack,
+      threat: attack ? previewAttack(attack)?.tileDamage : 0,
       defenders: attack ? unitsOnAttack(attack.id) : [],
       reduction: tile && state.phase !== 'setup' ? cityReduction(tile) : 0,
-      front: !!tile && isFrontline(tile),
+      exposed: tile ? exposedSidesOf(tile) : [],
     }
   }),
 )
@@ -47,7 +63,7 @@ function isActive(c: (typeof cells.value)[number]): boolean {
     case 'empty':
       return !c.tile
     case 'filled':
-      return !!c.tile
+      return !!c.tile && !c.tile.prebuilt
     case 'attacked':
       return !!c.attack
     case 'alive':
@@ -77,18 +93,32 @@ function isActive(c: (typeof cells.value)[number]): boolean {
           ruined: c.tile && c.tile.health === 0,
           attacked: !!c.attack,
           active: isActive(c),
-          front: c.front,
+          prebuilt: c.tile?.prebuilt,
         }"
-        :title="c.front ? 'Front line: attacked first' : undefined"
+        :style="{ boxShadow: frontMarkerShadow(c.exposed) }"
+        :title="
+          [
+            c.exposed.length && `Exposed from ${c.exposed.join(', ')}: attacked first`,
+            c.tile?.prebuilt && 'Prebuilt: cannot be moved',
+          ]
+            .filter(Boolean)
+            .join('. ') || undefined
+        "
         @click="emit('cellClick', c.cell)"
       >
         <template v-if="c.tile">
           <span class="name">{{ c.tile.def.name }}</span>
+          <span v-if="c.tile.prebuilt && state.phase === 'setup'" class="prebuilt-badge">Prebuilt</span>
           <span class="defense">
             DEF {{ tileDefense(c.tile) }}
             <em v-if="c.tile.bonusDefense > 0">(+{{ c.tile.bonusDefense }})</em>
           </span>
-          <StatBar :value="c.tile.health" :max="c.tile.def.health" kind="health" />
+          <StatBar
+            :value="c.tile.health"
+            :max="c.tile.def.health"
+            kind="health"
+            :threat="c.threat"
+          />
           <span v-if="c.attack" class="attack-badge" :class="{ merged: c.attack.merged > 0 }">
             ATK {{ c.attack.strength }}
             <template v-if="c.attack.merged > 0"> x{{ c.attack.merged + 1 }}</template>
@@ -110,12 +140,13 @@ function isActive(c: (typeof cells.value)[number]): boolean {
 <style lang="scss" scoped>
 @use '@/styles/variables' as *;
 
-$front-marker: 5px;
+$grid-width: 600px;
+$side-banner-width: 48px;
 
 .battlefield {
   display: grid;
   gap: $spacing;
-  width: min(100%, 560px);
+  width: min(100%, $grid-width);
 
   &.from-north {
     grid-template-areas: 'banner' 'grid';
@@ -135,25 +166,14 @@ $front-marker: 5px;
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
+  &.from-west,
+  &.from-east {
+    width: min(100%, $grid-width + $side-banner-width);
+  }
+
   &.from-west .banner,
   &.from-east .banner {
     writing-mode: vertical-rl;
-  }
-
-  &.from-north .cell.front {
-    box-shadow: inset 0 $front-marker 0 $color-attack;
-  }
-
-  &.from-south .cell.front {
-    box-shadow: inset 0 (-$front-marker) 0 $color-attack;
-  }
-
-  &.from-west .cell.front {
-    box-shadow: inset $front-marker 0 0 $color-attack;
-  }
-
-  &.from-east .cell.front {
-    box-shadow: inset (-$front-marker) 0 0 $color-attack;
   }
 }
 
@@ -209,6 +229,11 @@ $front-marker: 5px;
     opacity: 0.4;
   }
 
+  &.prebuilt {
+    border-style: double;
+    border-width: 4px;
+  }
+
   &.attacked {
     border-color: $color-attack;
   }
@@ -256,6 +281,15 @@ $front-marker: 5px;
     color: $color-bg;
     font-size: 11px;
     font-weight: 700;
+  }
+
+  .prebuilt-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    font-size: 10px;
+    color: $color-muted;
+    text-transform: uppercase;
   }
 
   .reduction {

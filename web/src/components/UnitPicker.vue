@@ -1,20 +1,19 @@
 <script setup lang="ts">
-import { GARRISON_PICKS, UNIT_DEFS } from '@/game/data'
-import { state, toggleUnit } from '@/game/store'
+import { garrisonPicks, garrisonPool, state, toggleUnit } from '@/game/store'
 </script>
 
 <template>
   <section class="panel">
-    <h2>Garrison ({{ state.pickedUnitDefIds.length }}/{{ GARRISON_PICKS }})</h2>
+    <h2>Garrison ({{ state.pickedUnitDefIds.length }}/{{ garrisonPicks() }})</h2>
     <div class="list">
       <button
-        v-for="def in UNIT_DEFS"
+        v-for="def in garrisonPool()"
         :key="def.id"
         class="item"
         :class="{ selected: state.pickedUnitDefIds.includes(def.id) }"
         :disabled="
           !state.pickedUnitDefIds.includes(def.id) &&
-          state.pickedUnitDefIds.length >= GARRISON_PICKS
+          state.pickedUnitDefIds.length >= garrisonPicks()
         "
         @click="toggleUnit(def.id)"
       >

@@ -1,75 +1,127 @@
-import { UNIT_DEFS, UNLOCKABLE_TILES, UNLOCKABLE_UNITS } from './data'
+import { garrisonPool, isLastCity } from './campaign'
+import { UNLOCKABLE_TILES, UNLOCKABLE_UNITS } from './data'
 import { createUnit, nextId } from './entities'
 import type { Rng } from './rng'
-import type { Card, GameState } from './types'
+import type { Card, GameState, TileDef, UnitDef } from './types'
 
-type CardTemplate = (state: Pick<GameState, 'nextId'>, rng: Rng) => Card
+export type DraftState = Pick<
+  GameState,
+  'nextId' | 'cityIndex' | 'tileUnlocks' | 'unitUnlocks' | 'unlocks'
+>
+
+interface CardTemplate {
+  nextCity: boolean
+  available?: (state: DraftState) => boolean
+  make: (state: DraftState, rng: Rng) => Card
+}
+
+/** Unlockable units not yet unlocked in the campaign or picked in this city. */
+function lockedUnits(state: DraftState): UnitDef[] {
+  const taken = new Set([
+    ...state.unitUnlocks,
+    ...state.unlocks.flatMap((c) => (c.effect.kind === 'unlockUnit' ? [c.effect.unit.id] : [])),
+  ])
+  return UNLOCKABLE_UNITS.filter((u) => !taken.has(u.id))
+}
+
+/** Unlockable tiles, minus unique ones already unlocked in the campaign or picked in this city. */
+function offerableTiles(state: DraftState): TileDef[] {
+  const taken = new Set([
+    ...Object.keys(state.tileUnlocks).filter((id) => state.tileUnlocks[id] > 0),
+    ...state.unlocks.flatMap((c) => (c.effect.kind === 'unlockTile' ? [c.effect.tile.id] : [])),
+  ])
+  return UNLOCKABLE_TILES.filter((t) => !(t.unique && taken.has(t.id)))
+}
 
 const TEMPLATES: CardTemplate[] = [
-  (state) => ({
-    id: nextId(state, 'card'),
-    name: 'Repair',
-    description: 'Restore 4 health to a tile.',
-    target: 'tile',
-    effect: { kind: 'repairTile', amount: 4 },
+  {
     nextCity: false,
-  }),
-  (state) => ({
-    id: nextId(state, 'card'),
-    name: 'Fortify',
-    description: 'A tile gets +1 defense next turn.',
-    target: 'tile',
-    effect: { kind: 'fortifyTile', amount: 1 },
-    nextCity: false,
-  }),
-  (state) => ({
-    id: nextId(state, 'card'),
-    name: 'Rest',
-    description: 'A unit regains full endurance and 1 health.',
-    target: 'unit',
-    effect: { kind: 'restUnit', heal: 1 },
-    nextCity: false,
-  }),
-  (state, rng) => {
-    const unit = rng.pick(Object.values(UNIT_DEFS))
-    return {
+    make: (state) => ({
       id: nextId(state, 'card'),
-      name: `Recruit ${unit.name}`,
-      description: `Add ${unit.name} to your garrison.`,
-      target: null,
-      effect: { kind: 'recruitUnit', unit },
+      name: 'Repair',
+      description: 'Restore 4 health to a tile.',
+      target: 'tile',
+      effect: { kind: 'repairTile', amount: 4 },
       nextCity: false,
-    }
+    }),
   },
-  (state, rng) => {
-    const tile = rng.pick(UNLOCKABLE_TILES)
-    return {
+  {
+    nextCity: false,
+    make: (state) => ({
       id: nextId(state, 'card'),
-      name: `Plans: ${tile.name}`,
-      description: `Unlock ${tile.name} for the next city. ${tile.description}`,
-      target: null,
-      effect: { kind: 'unlockTile', tile },
-      nextCity: true,
-    }
+      name: 'Fortify',
+      description: 'A tile gets +1 defense next turn.',
+      target: 'tile',
+      effect: { kind: 'fortifyTile', amount: 1 },
+      nextCity: false,
+    }),
   },
-  (state, rng) => {
-    const unit = rng.pick(UNLOCKABLE_UNITS)
-    return {
+  {
+    nextCity: false,
+    make: (state) => ({
       id: nextId(state, 'card'),
-      name: `Train ${unit.name}`,
-      description: `Unlock ${unit.name} for the next city. ${unit.description}`,
-      target: null,
-      effect: { kind: 'unlockUnit', unit },
-      nextCity: true,
-    }
+      name: 'Rest',
+      description: 'A unit regains full endurance and 1 health.',
+      target: 'unit',
+      effect: { kind: 'restUnit', heal: 1 },
+      nextCity: false,
+    }),
+  },
+  {
+    nextCity: false,
+    make: (state, rng) => {
+      const unit = rng.pick(garrisonPool(state.unitUnlocks))
+      return {
+        id: nextId(state, 'card'),
+        name: `Recruit ${unit.name}`,
+        description: `Add ${unit.name} to your garrison.`,
+        target: null,
+        effect: { kind: 'recruitUnit', unit },
+        nextCity: false,
+      }
+    },
+  },
+  {
+    nextCity: true,
+    available: (state) => offerableTiles(state).length > 0,
+    make: (state, rng) => {
+      const tile = rng.pick(offerableTiles(state))
+      return {
+        id: nextId(state, 'card'),
+        name: `Plans: ${tile.name}`,
+        description: `+1 ${tile.name} for every later city. ${tile.description}`,
+        target: null,
+        effect: { kind: 'unlockTile', tile },
+        nextCity: true,
+      }
+    },
+  },
+  {
+    nextCity: true,
+    available: (state) => lockedUnits(state).length > 0,
+    make: (state, rng) => {
+      const unit = rng.pick(lockedUnits(state))
+      return {
+        id: nextId(state, 'card'),
+        name: `Train ${unit.name}`,
+        description: `Unlock ${unit.name} for every later city. ${unit.description}`,
+        target: null,
+        effect: { kind: 'unlockUnit', unit },
+        nextCity: true,
+      }
+    },
   },
 ]
 
-export function rollDraft(state: Pick<GameState, 'nextId'>, rng: Rng, size = 3): Card[] {
+export function rollDraft(state: DraftState, rng: Rng, size = 3): Card[] {
+  const lastCity = isLastCity(state.cityIndex)
+  const templates = TEMPLATES.filter(
+    (t) => !(t.nextCity && lastCity) && (t.available?.(state) ?? true),
+  )
   return rng
-    .shuffle(TEMPLATES)
+    .shuffle(templates)
     .slice(0, size)
-    .map((template) => template(state, rng))
+    .map((template) => template.make(state, rng))
 }
 
 /** Applies a card to the state. Returns false if the target is missing or invalid. */

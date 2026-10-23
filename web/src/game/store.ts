@@ -1,43 +1,42 @@
 import { reactive } from 'vue'
-import { DIRECTIONS, frontlineRank, generateAttacks } from './attacks'
+import { exposedSides, generateAttacks } from './attacks'
+import {
+  bonusRecruits,
+  cityConfig,
+  createCity,
+  garrisonPicks as picksForPool,
+  garrisonPool as poolForUnlocks,
+  isLastCity,
+  mergeUnlocks,
+  newCampaign,
+} from './campaign'
 import { applyCard, rollDraft } from './cards'
 import { resolveAttack, type CombatResult } from './combat'
-import { DEFAULT_PALETTE, GARRISON_PICKS, GRID_SIZE, TILE_DEFS, UNIT_DEFS } from './data'
+import { ALL_TILE_DEFS, ALL_UNIT_DEFS } from './data'
 import { createTile, createUnit, isAdjacent, nextId } from './entities'
 import { eventModifiers, rollEvents } from './events'
 import { createRng, type Rng } from './rng'
-import type { Attack, Card, GameState, Tile, TriggeredEvent, Unit } from './types'
+import type {
+  Attack,
+  Card,
+  Direction,
+  GameState,
+  Tile,
+  TriggeredEvent,
+  Unit,
+  UnitDef,
+} from './types'
 
 let rng: Rng = createRng(Date.now())
 
-function initialState(): GameState {
-  return {
-    phase: 'setup',
-    turn: 0,
-    gridSize: GRID_SIZE,
-    attackDirection: rng.pick(DIRECTIONS),
-    nextId: 0,
-    tiles: [],
-    palette: { ...DEFAULT_PALETTE },
-    selectedTileDefId: null,
-    pickedUnitDefIds: [],
-    units: [],
-    attacks: [],
-    assignments: {},
-    selectedUnitId: null,
-    pendingEvents: [],
-    eventIndex: 0,
-    reports: [],
-    draft: [],
-    pendingCard: null,
-    unlocks: [],
-    fallReason: null,
-  }
-}
-
-export const state = reactive<GameState>(initialState())
+export const state = reactive<GameState>(newCampaign(rng))
 
 // Queries
+
+export const currentCity = () => cityConfig(state.cityIndex)
+export const garrisonPool = (): UnitDef[] => poolForUnlocks(state.unitUnlocks)
+export const garrisonPicks = (): number => picksForPool(garrisonPool().length)
+export const totalTurns = () => state.cityResults.reduce((sum, r) => sum + r.turns, 0)
 
 export const tileAt = (cell: number) => state.tiles.find((t) => t.cell === cell)
 export const tileById = (id: string) => state.tiles.find((t) => t.id === id)
@@ -65,8 +64,9 @@ export function cityReduction(tile: Tile): number {
     )
 }
 
-export function isFrontline(tile: Tile): boolean {
-  return tile.health > 0 && frontlineRank(tile, state.tiles, state.attackDirection, state.gridSize) === 0
+/** Sides from which the enemy can currently reach `tile`. Empty if it is shielded. */
+export function exposedSidesOf(tile: Tile): Direction[] {
+  return exposedSides(tile, state.tiles, state.attackDirection, state.gridSize)
 }
 
 /** Combat outcome for an attack with the current assignments, ignoring events. */
@@ -119,7 +119,7 @@ export function eventImpact(triggered: TriggeredEvent): EventImpact | undefined 
 
 export function canStartCity(): boolean {
   return (
-    state.tiles.some((t) => t.def.essential) && state.pickedUnitDefIds.length === GARRISON_PICKS
+    state.tiles.some((t) => t.def.essential) && state.pickedUnitDefIds.length === garrisonPicks()
   )
 }
 
@@ -132,14 +132,14 @@ export function selectTileDef(defId: string | null) {
 export function placeTile(cell: number) {
   const defId = state.selectedTileDefId
   if (!defId || tileAt(cell) || (state.palette[defId] ?? 0) <= 0) return
-  state.tiles.push(createTile(state, TILE_DEFS[defId], cell))
+  state.tiles.push(createTile(state, ALL_TILE_DEFS[defId], cell))
   state.palette[defId]--
   if (state.palette[defId] === 0) state.selectedTileDefId = null
 }
 
 export function removeTile(cell: number) {
   const tile = tileAt(cell)
-  if (!tile) return
+  if (!tile || tile.prebuilt) return
   state.tiles = state.tiles.filter((t) => t !== tile)
   state.palette[tile.def.id] = (state.palette[tile.def.id] ?? 0) + 1
 }
@@ -148,14 +148,17 @@ export function toggleUnit(defId: string) {
   const picked = state.pickedUnitDefIds
   if (picked.includes(defId)) {
     state.pickedUnitDefIds = picked.filter((id) => id !== defId)
-  } else if (picked.length < GARRISON_PICKS) {
+  } else if (picked.length < garrisonPicks() && garrisonPool().some((u) => u.id === defId)) {
     picked.push(defId)
   }
 }
 
 export function startCity() {
   if (!canStartCity()) return
-  state.units = state.pickedUnitDefIds.map((id) => createUnit(state, UNIT_DEFS[id]))
+  state.units = [
+    ...state.pickedUnitDefIds.map((id) => ALL_UNIT_DEFS[id]),
+    ...bonusRecruits(state.tiles),
+  ].map((def) => createUnit(state, def))
   state.selectedTileDefId = null
   state.turn = 1
   beginTurn()
@@ -171,6 +174,7 @@ function beginTurn() {
     () => nextId(state, 'attack'),
     state.attackDirection,
     state.gridSize,
+    currentCity().attackBonus,
   )
   state.assignments = Object.fromEntries(state.attacks.map((a) => [a.id, []]))
   state.selectedUnitId = null
@@ -280,14 +284,20 @@ function applyResolution() {
   const keepLost = state.tiles.some((t) => t.def.essential && t.health === 0)
   const allLost = state.tiles.every((t) => t.health === 0)
   if (keepLost || allLost) {
-    state.fallReason = keepLost ? 'The Keep was destroyed.' : 'Every tile was destroyed.'
-    state.phase = 'gameover'
+    fallCity(keepLost ? 'The Keep was destroyed.' : 'Every tile was destroyed.')
     return
   }
 
   state.draft = rollDraft(state, rng)
   state.pendingCard = null
   state.phase = 'draft'
+}
+
+function fallCity(reason: string) {
+  state.fallReason = reason
+  state.cityResults.push({ name: currentCity().name, turns: state.turn - 1, fallReason: reason })
+  Object.assign(state, mergeUnlocks(state, state.unlocks))
+  state.phase = isLastCity(state.cityIndex) ? 'campaignOver' : 'cityFallen'
 }
 
 // Draft actions
@@ -318,7 +328,20 @@ export function skipDraft() {
   if (state.phase === 'draft') endDraft()
 }
 
+// Campaign actions
+
+export function nextCity() {
+  if (state.phase !== 'cityFallen') return
+  const progress = {
+    cityIndex: state.cityIndex + 1,
+    cityResults: state.cityResults,
+    tileUnlocks: state.tileUnlocks,
+    unitUnlocks: state.unitUnlocks,
+  }
+  Object.assign(state, createCity(progress, state.nextId, rng))
+}
+
 export function restart() {
   rng = createRng(Date.now())
-  Object.assign(state, initialState())
+  Object.assign(state, newCampaign(rng))
 }

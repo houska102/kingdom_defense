@@ -1,7 +1,12 @@
-import type { TileDef, UnitDef } from './types'
+import type { CityConfig, Direction, TileDef, UnitDef } from './types'
 
 export const GRID_SIZE = 4
-export const GARRISON_PICKS = 3
+/** Every city is attacked from this side. Set to null to roll a random side per city. */
+export const FIXED_ATTACK_DIRECTION: Direction | null = 'north'
+export const MIN_GARRISON_PICKS = 3
+/** Share of the garrison pool that can be picked for a city. */
+export const GARRISON_PICK_RATIO = 3 / 5
+export const CAMPAIGN_LENGTH = 10
 
 export const TILE_DEFS: Record<string, TileDef> = {
   keep: {
@@ -110,8 +115,33 @@ export const UNLOCKABLE_TILES: TileDef[] = [
     name: 'Infirmary',
     defense: 1,
     health: 4,
+    unique: true,
     passive: { kind: 'garrisonRegen', amount: 1 },
     description: 'While standing, all garrison regains +1 endurance per turn.',
+  },
+  {
+    id: 'stockade',
+    name: 'Stockade',
+    defense: 2,
+    health: 7,
+    description: 'Thick timber walls that take a beating.',
+  },
+  {
+    id: 'ballista',
+    name: 'Ballista Tower',
+    defense: 1,
+    health: 5,
+    passive: { kind: 'adjacentAttackReduction', amount: 2 },
+    description: 'Attacks on adjacent tiles are 2 weaker.',
+  },
+  {
+    id: 'militiaCenter',
+    name: 'Militia Center',
+    defense: 2,
+    health: 4,
+    unique: true,
+    passive: { kind: 'recruitPerTile', perTileDefId: 'house', unitDefId: 'militia' },
+    description: 'When the defense starts, adds 1 Militia to the garrison for each House.',
   },
 ]
 
@@ -132,5 +162,108 @@ export const UNLOCKABLE_UNITS: UnitDef[] = [
     health: 6,
     endurance: 3,
     description: 'Elite heavy defenders.',
+  },
+  {
+    id: 'longbowmen',
+    name: 'Longbowmen',
+    strength: 2,
+    health: 3,
+    endurance: 3,
+    passive: { kind: 'attackReduction', amount: 1 },
+    description: 'The attack they defend is 1 weaker. Hardier than archers.',
+  },
+  {
+    id: 'wardens',
+    name: 'Wardens',
+    strength: 3,
+    health: 5,
+    endurance: 2,
+    passive: { kind: 'enduranceRegen', amount: 1 },
+    description: 'Regain +1 endurance after fighting.',
+  },
+]
+
+export const ALL_TILE_DEFS: Record<string, TileDef> = {
+  ...TILE_DEFS,
+  ...Object.fromEntries(UNLOCKABLE_TILES.map((t) => [t.id, t])),
+}
+
+export const ALL_UNIT_DEFS: Record<string, UnitDef> = {
+  ...UNIT_DEFS,
+  ...Object.fromEntries(UNLOCKABLE_UNITS.map((u) => [u.id, u])),
+}
+
+/** One entry per city in campaign order. Prebuilt tiles are leftovers from earlier fighting. */
+export const CITY_CONFIGS: CityConfig[] = [
+  { name: 'Ashford', attackBonus: 0, prebuilt: [] },
+  { name: 'Brightwater', attackBonus: 0.5, prebuilt: [] },
+  { name: 'Coldharbour', attackBonus: 1, prebuilt: [{ defId: 'house', cell: 5, health: 2 }] },
+  {
+    name: 'Dunmere',
+    attackBonus: 1.5,
+    prebuilt: [
+      { defId: 'wall', cell: 0 },
+      { defId: 'house', cell: 15, health: 2 },
+    ],
+  },
+  {
+    name: 'Eastmarch',
+    attackBonus: 2,
+    prebuilt: [
+      { defId: 'wall', cell: 0 },
+      { defId: 'wall', cell: 3 },
+      { defId: 'house', cell: 10, health: 3 },
+    ],
+  },
+  {
+    name: 'Fallowmoor',
+    attackBonus: 2.5,
+    prebuilt: [
+      { defId: 'wall', cell: 0, health: 4 },
+      { defId: 'house', cell: 6 },
+      { defId: 'house', cell: 9, health: 2 },
+    ],
+  },
+  {
+    name: 'Greyhaven',
+    attackBonus: 3,
+    prebuilt: [
+      { defId: 'house', cell: 5, health: 1 },
+      { defId: 'house', cell: 6, health: 2 },
+      { defId: 'house', cell: 9 },
+      { defId: 'wall', cell: 15, health: 3 },
+    ],
+  },
+  {
+    name: 'Highcrag',
+    attackBonus: 3.5,
+    prebuilt: [
+      { defId: 'wall', cell: 1, health: 4 },
+      { defId: 'wall', cell: 2, health: 4 },
+      { defId: 'house', cell: 13, health: 2 },
+      { defId: 'house', cell: 14, health: 2 },
+    ],
+  },
+  {
+    name: 'Ironvale',
+    attackBonus: 4,
+    prebuilt: [
+      { defId: 'house', cell: 0, health: 2 },
+      { defId: 'house', cell: 3, health: 2 },
+      { defId: 'house', cell: 12, health: 2 },
+      { defId: 'house', cell: 15, health: 2 },
+      { defId: 'watchtower', cell: 6, health: 2 },
+    ],
+  },
+  {
+    name: 'Kingsreach',
+    attackBonus: 4.5,
+    prebuilt: [
+      { defId: 'wall', cell: 5, health: 3 },
+      { defId: 'wall', cell: 10, health: 3 },
+      { defId: 'house', cell: 0, health: 1 },
+      { defId: 'house', cell: 3, health: 2 },
+      { defId: 'house', cell: 15, health: 1 },
+    ],
   },
 ]

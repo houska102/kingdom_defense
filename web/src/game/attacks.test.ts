@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { attackCount, baseAttackStrength, frontlineRank, generateAttacks } from './attacks'
+import {
+  attackCount,
+  baseAttackStrength,
+  exposedSides,
+  frontlineRank,
+  generateAttacks,
+} from './attacks'
 import { TILE_DEFS } from './data'
 import { createRng } from './rng'
 import type { Direction, Tile } from './types'
@@ -39,11 +45,35 @@ describe('frontlineRank', () => {
   })
 
   it('ignores empty cells and destroyed tiles in front', () => {
-    // Column x=0: cell 0 destroyed, cell 4 empty, cell 8 standing, cell 12 standing
-    const tiles = [tileAt(0, 0), tileAt(8), tileAt(12)]
+    // Column x=0: cell 0 destroyed, cell 4 empty, cells 8 and 12 standing
+    const tiles = fullGrid()
+      .filter((t) => t.cell !== 4)
+      .map((t) => (t.cell === 0 ? { ...t, health: 0 } : t))
     expect(rankOf(tiles, 8, 'north')).toBe(0)
     expect(rankOf(tiles, 12, 'north')).toBe(1)
     expect(rankOf(tiles, 12, 'south')).toBe(0)
+  })
+
+  it('exposes tiles whose flank opens onto a reachable gap', () => {
+    // Column x=0 is open down to y=1, so cells 1 and 5 are reachable from the west side
+    const tiles = fullGrid()
+      .filter((t) => t.cell !== 4)
+      .map((t) => (t.cell === 0 ? { ...t, health: 0 } : t))
+    expect(rankOf(tiles, 5, 'north')).toBe(0)
+    expect(rankOf(tiles, 9, 'north')).toBe(2)
+
+    const at = (cell: number) => tiles.find((t) => t.cell === cell)!
+    expect(exposedSides(at(1), tiles, 'north', GRID)).toEqual(['north', 'west'])
+    expect(exposedSides(at(5), tiles, 'north', GRID)).toEqual(['west'])
+    expect(exposedSides(at(9), tiles, 'north', GRID)).toEqual([])
+  })
+
+  it('does not expose tiles next to an enclosed hole', () => {
+    // Cell 10 (x=2, y=2) is destroyed but surrounded by standing tiles
+    const tiles = fullGrid().map((t) => (t.cell === 10 ? { ...t, health: 0 } : t))
+    expect(rankOf(tiles, 9, 'north')).toBe(2)
+    expect(rankOf(tiles, 14, 'north')).toBe(2)
+    expect(exposedSides(tiles[6], tiles, 'north', GRID)).toEqual([])
   })
 })
 
@@ -92,5 +122,13 @@ describe('attack escalation', () => {
       expect(baseAttackStrength(turn + 1)).toBeGreaterThan(baseAttackStrength(turn))
     }
     expect(attackCount(20)).toBeGreaterThan(attackCount(1))
+  })
+
+  it('adds the city attack bonus to every attack', () => {
+    expect(baseAttackStrength(3, 2)).toBe(baseAttackStrength(3) + 2)
+    const tiles = fullGrid()
+    const plain = generateAttacks(2, tiles, createRng(9), idMaker(), 'north', GRID)
+    const boosted = generateAttacks(2, tiles, createRng(9), idMaker(), 'north', GRID, 4)
+    boosted.forEach((a, i) => expect(a.strength).toBe(plain[i].strength + 4))
   })
 })
