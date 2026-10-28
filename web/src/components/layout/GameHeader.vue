@@ -1,6 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { CAMPAIGN_LENGTH } from '@/game/data'
-import { currentCity, state } from '@/game/store'
+import { currentCity, restart, state } from '@/game/store'
+
+const canRestart = computed(() => state.phase !== 'cityFallen' && state.phase !== 'campaignOver')
+
+function confirmRestart() {
+  if (window.confirm('Abandon this campaign and start over?')) restart()
+}
 </script>
 
 <template>
@@ -11,6 +18,7 @@ import { currentCity, state } from '@/game/store'
       <template v-if="state.phase !== 'setup'"> - Turn {{ state.turn }}</template>
     </span>
     <span class="gold">{{ state.gold }} gold</span>
+    <button v-if="canRestart" class="restart" @click="confirmRestart">Restart</button>
   </header>
 </template>
 
@@ -18,6 +26,7 @@ import { currentCity, state } from '@/game/store'
 @use '@/styles/variables' as *;
 
 header {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: $spacing * 2;
@@ -37,6 +46,21 @@ header {
     color: $color-accent;
   }
 
+  .restart {
+    padding: 2px $spacing;
+    border: 1px solid $color-border;
+    border-radius: $radius;
+    background: none;
+    color: $color-muted;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      color: $color-text;
+    }
+  }
+
   @media (max-width: 900px) {
     flex-wrap: wrap;
     gap: $spacing;
@@ -50,6 +74,13 @@ header {
     .turn,
     .gold {
       font-size: 14px;
+    }
+
+    .restart {
+      position: absolute;
+      top: 2px;
+      right: 0;
+      font-size: 11px;
     }
   }
 }

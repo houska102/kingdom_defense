@@ -21,6 +21,10 @@ Only the way the player interacts with it differs.
 | Card draft | Side panel | Modal |
 | Omens, treasury, log, unlocks | Always visible in the side panel | Small buttons above the grid, each opens a modal |
 | City fallen / game over | Side panel | Modal that can't be dismissed |
+| Restart | Small button next to the gold in the header | Small button at the top right of the title |
+
+The restart button asks for confirmation and is hidden on the city fallen / game over screens,
+which have their own "New campaign" button.
 
 ## Setup
 

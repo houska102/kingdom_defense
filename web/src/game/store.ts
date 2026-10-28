@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { reactive, watch } from 'vue'
 import { exposedSides, generateAttacks } from './attacks'
 import { PREVENT_BATTLE_EVENT_COST, battleTotal, describeBattleEffect } from './battleEvents'
 import {
@@ -24,6 +24,7 @@ import {
 } from './entities'
 import { EVENT_CHANCE, eventModifiers, goodEventChance, rollEvents } from './events'
 import { createRng, type Rng } from './rng'
+import { loadSave, writeSave } from './save'
 import type {
   Attack,
   BattleEffectKind,
@@ -37,9 +38,12 @@ import type {
   UnitDef,
 } from './types'
 
-let rng: Rng = createRng(Date.now())
+const saved = loadSave()
+let rng: Rng = createRng(saved?.seed ?? Date.now())
 
-export const state = reactive<GameState>(newCampaign(rng))
+export const state = reactive<GameState>(saved?.state ?? newCampaign(rng))
+
+watch(state, () => writeSave(state, rng.seed()), { deep: true })
 
 // Queries
 

@@ -3,6 +3,8 @@ export interface Rng {
   int(min: number, max: number): number
   pick<T>(items: readonly T[]): T
   shuffle<T>(items: readonly T[]): T[]
+  /** Current position, `createRng(rng.seed())` continues the same sequence. */
+  seed(): number
 }
 
 /** Seeded mulberry32 generator. */
@@ -31,5 +33,6 @@ export function createRng(seed: number): Rng {
       }
       return result
     },
+    seed: () => state,
   }
 }
