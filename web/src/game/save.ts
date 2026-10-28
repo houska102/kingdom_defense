@@ -2,7 +2,7 @@ import type { GameState } from './types'
 
 const SAVE_KEY = 'kingdom_defense.save'
 /** Bump whenever the shape of GameState changes, older saves are then discarded. */
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 export interface SaveData {
   state: GameState

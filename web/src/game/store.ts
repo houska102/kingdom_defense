@@ -7,12 +7,15 @@ import {
   createCity,
   garrisonPicks as picksForPool,
   garrisonPool as poolForUnlocks,
+  isFreePick,
   isLastCity,
   mergeUnlocks,
   newCampaign,
+  payUpkeep,
+  upkeepOf,
 } from './campaign'
 import { applyCard, draftSize, rollDraft } from './cards'
-import { resolveAttack, type CombatResult } from './combat'
+import { resolveAttack, type CombatResult, type StrengthContext } from './combat'
 import { ALL_TILE_DEFS, ALL_UNIT_DEFS } from './data'
 import {
   createTile,
@@ -22,7 +25,7 @@ import {
   passiveTotal,
   tilePassives,
 } from './entities'
-import { EVENT_CHANCE, eventModifiers, goodEventChance, rollEvents } from './events'
+import { EVENT_CHANCE, eventModifiers, goodEventChance, inspiringBonus, rollEvents } from './events'
 import { createRng, type Rng } from './rng'
 import { loadSave, writeSave } from './save'
 import type {
@@ -51,7 +54,25 @@ export const currentCity = () => cityConfig(state.cityIndex)
 export const garrisonPool = (): UnitDef[] => poolForUnlocks(state.unitUnlocks)
 export const battleModifier = (kind: BattleEffectKind) => battleTotal(state.battleEvents, kind)
 export const garrisonPicks = (): number =>
-  Math.max(1, picksForPool(garrisonPool().length) + battleModifier('garrisonPicks'))
+  Math.max(
+    1,
+    picksForPool(garrisonPool().filter((u) => !isFreePick(u)).length) +
+      battleModifier('garrisonPicks'),
+  )
+const pickedDefs = () => state.pickedUnitDefIds.map((id) => ALL_UNIT_DEFS[id])
+/** Picked units that use a garrison pick. */
+export const pickedCount = () => pickedDefs().filter((u) => !isFreePick(u)).length
+const pickedUpkeep = () => pickedDefs().reduce((sum, u) => sum + upkeepOf(u), 0)
+
+/** Whether `def` can be added to the picked garrison. */
+export function canPickUnit(def: UnitDef): boolean {
+  if (state.pickedUnitDefIds.includes(def.id) || !garrisonPool().some((u) => u.id === def.id)) {
+    return false
+  }
+  return isFreePick(def)
+    ? state.gold >= pickedUpkeep() + upkeepOf(def)
+    : pickedCount() < garrisonPicks()
+}
 export const totalTurns = () => state.cityResults.reduce((sum, r) => sum + r.turns, 0)
 
 export const tileAt = (cell: number) => state.tiles.find((t) => t.cell === cell)
@@ -98,11 +119,22 @@ export function exposedSidesOf(tile: Tile): Direction[] {
   return exposedSides(tile, state.tiles, state.attackDirection, state.gridSize)
 }
 
+function combatContext(tile: Tile): StrengthContext {
+  return { exposedSides: exposedSidesOf(tile).length, fallenUnits: state.fallenUnits }
+}
+
 /** Combat outcome for an attack with the current assignments, ignoring events. */
 export function previewAttack(attack: Attack): CombatResult | undefined {
   const tile = tileById(attack.tileId)
   if (!tile) return undefined
-  return resolveAttack(attack, tile, unitsOnAttack(attack.id), cityReduction(tile))
+  return resolveAttack(
+    attack,
+    tile,
+    unitsOnAttack(attack.id),
+    cityReduction(tile),
+    {},
+    combatContext(tile),
+  )
 }
 
 function resolveWithEvent(attack: Attack, triggered?: TriggeredEvent): CombatResult | undefined {
@@ -116,6 +148,7 @@ function resolveWithEvent(attack: Attack, triggered?: TriggeredEvent): CombatRes
     unitsOnAttack(attack.id),
     cityReduction(tile),
     outcome.mods,
+    combatContext(tile),
   )
 }
 
@@ -172,7 +205,9 @@ export function eventImpact(triggered: TriggeredEvent): EventImpact | undefined 
 
 export function canStartCity(): boolean {
   return (
-    state.tiles.some((t) => t.def.essential) && state.pickedUnitDefIds.length === garrisonPicks()
+    state.tiles.some((t) => t.def.essential) &&
+    pickedCount() === garrisonPicks() &&
+    state.gold >= pickedUpkeep()
   )
 }
 
@@ -200,7 +235,7 @@ export function toggleUnit(defId: string) {
   const picked = state.pickedUnitDefIds
   if (picked.includes(defId)) {
     state.pickedUnitDefIds = picked.filter((id) => id !== defId)
-  } else if (picked.length < garrisonPicks() && garrisonPool().some((u) => u.id === defId)) {
+  } else if (canPickUnit(ALL_UNIT_DEFS[defId])) {
     picked.push(defId)
   }
 }
@@ -322,10 +357,9 @@ export function endTurn() {
   if (state.phase !== 'assign') return
   state.selectedUnitId = null
   const defended = state.attacks.filter((a) => (state.assignments[a.id]?.length ?? 0) > 0)
-  const goodChance = Math.min(
-    1,
-    Math.max(0, goodEventChance(state.tiles) + battleModifier('goodEventChance')),
-  )
+  const baseChance = goodEventChance(state.tiles) + battleModifier('goodEventChance')
+  const goodChance = (attack: Attack) =>
+    Math.min(1, Math.max(0, baseChance + inspiringBonus(unitsOnAttack(attack.id))))
   state.pendingEvents = rollEvents(defended, rng, EVENT_CHANCE, goodChance)
   state.eventIndex = 0
   if (state.pendingEvents.length > 0) state.phase = 'event'
@@ -363,9 +397,9 @@ function applyResolution() {
     if (tile.health === 0) lines.push(`${tile.def.name} was destroyed!`)
   }
 
-  for (const unit of state.units.filter((u) => u.health === 0)) {
-    lines.push(`${unit.def.name} fell in battle.`)
-  }
+  const fallen = state.units.filter((u) => u.health === 0)
+  for (const unit of fallen) lines.push(`${unit.def.name} fell in battle.`)
+  state.fallenUnits += fallen.length
   state.units = state.units.filter((u) => u.health > 0)
 
   const cityRegen = passiveTotal(state.tiles, 'garrisonRegen')
@@ -375,6 +409,15 @@ function applyResolution() {
     state.gold += income
     lines.push(`The treasury gains ${income} gold (${state.gold} total).`)
   }
+  const goldBeforeUpkeep = state.gold
+  const upkeep = payUpkeep(state.units, state.gold)
+  state.gold = upkeep.gold
+  if (state.gold < goldBeforeUpkeep) {
+    lines.push(`Paid ${goldBeforeUpkeep - state.gold} gold upkeep (${state.gold} left).`)
+  }
+  for (const unit of upkeep.dismissed) lines.push(`${unit.def.name} left, the pay ran out.`)
+  const dismissedIds = new Set(upkeep.dismissed.map((u) => u.id))
+  state.units = state.units.filter((u) => !dismissedIds.has(u.id))
   for (const unit of state.units) {
     unit.health = Math.min(unit.def.health, unit.health + cityHeal)
     if (fought.has(unit.id)) {

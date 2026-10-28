@@ -48,6 +48,41 @@ export function splitProportionally(total: number, weights: number[]): number[] 
   return shares
 }
 
+export interface StrengthContext {
+  /** Sides from which the enemy can reach the defended tile. */
+  exposedSides: number
+  /** Units that died in the current city. */
+  fallenUnits: number
+}
+
+const NO_CONTEXT: StrengthContext = { exposedSides: 0, fallenUnits: 0 }
+
+/** Strength of `unit` with passives applied, given every unit defending the same attack. */
+export function unitStrength(unit: Unit, units: Unit[], ctx: StrengthContext = NO_CONTEXT): number {
+  const others = units.filter((u) => u.id !== unit.id)
+  const banner = others.reduce(
+    (sum, u) => sum + (u.def.passive?.kind === 'banner' ? u.def.passive.amount : 0),
+    0,
+  )
+  return unit.def.strength + banner + ownBonus(unit, others, ctx)
+}
+
+function ownBonus(unit: Unit, others: Unit[], ctx: StrengthContext): number {
+  const passive = unit.def.passive
+  switch (passive?.kind) {
+    case 'spearWall':
+      return passive.amount * others.filter((u) => u.def.id === unit.def.id).length
+    case 'lastStand':
+      return unit.health === 1 ? passive.amount : 0
+    case 'flanker':
+      return ctx.exposedSides > 1 ? passive.amount : 0
+    case 'bloodlust':
+      return passive.amount * ctx.fallenUnits
+    default:
+      return 0
+  }
+}
+
 /**
  * Resolves one attack against a tile and the units assigned to it.
  * `cityReduction` covers reductions from other tiles, such as adjacent watchtowers.
@@ -58,6 +93,7 @@ export function resolveAttack(
   units: Unit[],
   cityReduction = 0,
   mods: CombatModifiers = {},
+  ctx: StrengthContext = NO_CONTEXT,
 ): CombatResult {
   const unitReduction = units.reduce(
     (sum, u) => sum + (u.def.passive?.kind === 'attackReduction' ? u.def.passive.amount : 0),
@@ -70,7 +106,9 @@ export function resolveAttack(
   const blockedByTile = Math.min(effective, defense)
   let remaining = effective - blockedByTile
 
-  const strengths = units.map((u) => Math.max(0, u.def.strength + (mods.strengthBonus ?? 0)))
+  const strengths = units.map((u) =>
+    Math.max(0, unitStrength(u, units, ctx) + (mods.strengthBonus ?? 0)),
+  )
   const totalStrength = strengths.reduce((sum, s) => sum + s, 0)
   const absorbedByGarrison = Math.min(remaining, totalStrength)
   remaining -= absorbedByGarrison

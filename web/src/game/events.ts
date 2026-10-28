@@ -1,7 +1,7 @@
 import type { CombatModifiers } from './combat'
 import { passiveTotal } from './entities'
 import type { Rng } from './rng'
-import type { Attack, GameEvent, Tile, TriggeredEvent } from './types'
+import type { Attack, GameEvent, Tile, TriggeredEvent, Unit } from './types'
 
 export const EVENT_CHANCE = 0.2
 export const GOOD_EVENT_CHANCE = 0.7
@@ -70,19 +70,31 @@ export function goodEventChance(tiles: Tile[]): number {
   return Math.min(1, GOOD_EVENT_CHANCE + passiveTotal(tiles, 'goodEventBonus'))
 }
 
+/** Good event chance added by `inspiring` passives of the units defending an attack. */
+export function inspiringBonus(units: Unit[]): number {
+  return units.reduce(
+    (sum, u) => sum + (u.def.passive?.kind === 'inspiring' ? u.def.passive.amount : 0),
+    0,
+  )
+}
+
 const GOOD_EVENTS = EVENT_DEFS.filter((e) => e.good)
 const BAD_EVENTS = EVENT_DEFS.filter((e) => !e.good)
 
-/** Each attack has `chance` to trigger an event, which is good with probability `goodChance`. */
+/**
+ * Each attack has `chance` to trigger an event, which is good with probability `goodChance`.
+ * `goodChance` can be a function to give each attack its own chance.
+ */
 export function rollEvents(
   attacks: Attack[],
   rng: Rng,
   chance = EVENT_CHANCE,
-  goodChance = GOOD_EVENT_CHANCE,
+  goodChance: number | ((attack: Attack) => number) = GOOD_EVENT_CHANCE,
 ): TriggeredEvent[] {
   return attacks.flatMap((attack) => {
     if (rng.next() >= chance) return []
-    const pool = rng.next() < goodChance ? GOOD_EVENTS : BAD_EVENTS
+    const good = typeof goodChance === 'function' ? goodChance(attack) : goodChance
+    const pool = rng.next() < good ? GOOD_EVENTS : BAD_EVENTS
     return [{ attackId: attack.id, event: rng.pick(pool) }]
   })
 }

@@ -23,6 +23,23 @@ export type AmountPassiveKind = Extract<TilePassive, { amount: number }>['kind']
 export type UnitPassive =
   | { kind: 'attackReduction'; amount: number }
   | { kind: 'enduranceRegen'; amount: number }
+  /** +`amount` strength for each other unit of the same type defending the same attack. */
+  | { kind: 'spearWall'; amount: number }
+  /** Raises the chance that an event on the unit's attack is good by `amount` (0.15 = +15%). */
+  | { kind: 'inspiring'; amount: number }
+  /** +`amount` strength while the unit is at 1 health. */
+  | { kind: 'lastStand'; amount: number }
+  /**
+   * Doesn't use a garrison pick, can only be picked with at least `upkeep` gold.
+   * Costs `upkeep` gold at the end of each turn and leaves when it can't be paid.
+   */
+  | { kind: 'paidBlade'; upkeep: number }
+  /** +`amount` strength when the defended tile is exposed from more than one side. */
+  | { kind: 'flanker'; amount: number }
+  /** +`amount` strength for each unit that died in the current city. */
+  | { kind: 'bloodlust'; amount: number }
+  /** +`amount` strength to every other unit defending the same attack. */
+  | { kind: 'banner'; amount: number }
 
 export interface TileDef {
   id: string
@@ -216,4 +233,6 @@ export interface GameState extends CampaignProgress {
   /** Next-city cards picked in the current city. */
   unlocks: Card[]
   fallReason: string | null
+  /** Units that died in the current city. */
+  fallenUnits: number
 }

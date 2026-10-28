@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveAttack, splitProportionally } from './combat'
+import { resolveAttack, splitProportionally, unitStrength } from './combat'
 import type { Attack, Tile, TileDef, Unit, UnitDef } from './types'
 
 const tileDef: TileDef = { id: 't', name: 'Tile', defense: 2, health: 8, description: '' }
@@ -67,6 +67,50 @@ describe('resolveAttack with multiple units', () => {
     expect(r.reduction).toBe(2)
     expect(r.effective).toBe(8)
     expect(r.tileDamage).toBe(3)
+  })
+})
+
+describe('unit strength passives', () => {
+  const spearDef: UnitDef = { ...unitDef, id: 'spear', passive: { kind: 'spearWall', amount: 1 } }
+
+  it('spear wall adds strength per other unit of the same type', () => {
+    const spears = [unit('s1', spearDef), unit('s2', spearDef), unit('s3', spearDef)]
+    expect(spears.map((s) => unitStrength(s, spears))).toEqual([5, 5, 5])
+    expect(unitStrength(spears[0], [spears[0], unit('other')])).toBe(3)
+  })
+
+  it('last stand adds strength only at 1 HP', () => {
+    const def: UnitDef = { ...unitDef, health: 4, passive: { kind: 'lastStand', amount: 2 } }
+    const berserker = unit('b', def)
+    expect(unitStrength(berserker, [berserker])).toBe(3)
+    const wounded = { ...berserker, health: 1 }
+    expect(unitStrength(wounded, [wounded])).toBe(5)
+    expect(resolveAttack(attack(20), tile, [wounded]).absorbedByGarrison).toBe(5)
+  })
+
+  it('flanker adds strength only when exposed from more than one side', () => {
+    const skirm = unit('sk', { ...unitDef, passive: { kind: 'flanker', amount: 2 } })
+    expect(unitStrength(skirm, [skirm], { exposedSides: 1, fallenUnits: 0 })).toBe(3)
+    expect(unitStrength(skirm, [skirm], { exposedSides: 2, fallenUnits: 0 })).toBe(5)
+  })
+
+  it('bloodlust adds strength per fallen unit', () => {
+    const warlord = unit('w', { ...unitDef, passive: { kind: 'bloodlust', amount: 1 } })
+    expect(unitStrength(warlord, [warlord])).toBe(3)
+    expect(unitStrength(warlord, [warlord], { exposedSides: 0, fallenUnits: 4 })).toBe(7)
+    const r = resolveAttack(attack(20), tile, [warlord], 0, {}, { exposedSides: 0, fallenUnits: 2 })
+    expect(r.absorbedByGarrison).toBe(5)
+  })
+
+  it('banner adds strength to every other unit on the attack', () => {
+    const bearerDef: UnitDef = { ...unitDef, id: 'bearer', strength: 1, passive: { kind: 'banner', amount: 1 } }
+    const bearer = unit('b', bearerDef)
+    const other = unit('o')
+    const squad = [bearer, other]
+    expect(unitStrength(bearer, squad)).toBe(1)
+    expect(unitStrength(other, squad)).toBe(4)
+    const twoBearers = [bearer, unit('b2', bearerDef), other]
+    expect(twoBearers.map((u) => unitStrength(u, twoBearers))).toEqual([2, 2, 5])
   })
 })
 

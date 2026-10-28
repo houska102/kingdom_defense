@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_TILE_DEFS } from './data'
-import { createTile } from './entities'
+import { ALL_TILE_DEFS, ALL_UNIT_DEFS } from './data'
+import { createTile, createUnit } from './entities'
 import {
   EVENT_DEFS,
   GOOD_EVENT_CHANCE,
   eventModifiers,
   goodEventChance,
+  inspiringBonus,
   rollEvents,
 } from './events'
 import { createRng } from './rng'
@@ -29,6 +30,11 @@ describe('rollEvents', () => {
   it('respects the good/bad split', () => {
     expect(rollEvents(attacks(30), createRng(3), 1, 1).every((e) => e.event.good)).toBe(true)
     expect(rollEvents(attacks(30), createRng(4), 1, 0).every((e) => !e.event.good)).toBe(true)
+  })
+
+  it('accepts a good chance per attack', () => {
+    const events = rollEvents(attacks(30), createRng(7), 1, (a) => (a.id === 'a-0' ? 1 : 0))
+    expect(events.map((e) => e.event.good)).toEqual(events.map((e) => e.attackId === 'a-0'))
   })
 
   it('is roughly 70% good by default', () => {
@@ -60,6 +66,16 @@ describe('goodEventChance', () => {
     expect(goodEventChance(tiles)).toBeCloseTo(GOOD_EVENT_CHANCE + 0.1)
     tiles[1].health = 0
     expect(goodEventChance(tiles)).toBe(GOOD_EVENT_CHANCE)
+  })
+})
+
+describe('inspiringBonus', () => {
+  it('sums inspiring passives of the defenders', () => {
+    const ids = { nextId: 0 }
+    const captain = createUnit(ids, ALL_UNIT_DEFS.captain)
+    const militia = createUnit(ids, ALL_UNIT_DEFS.militia)
+    expect(inspiringBonus([militia])).toBe(0)
+    expect(inspiringBonus([captain, militia, captain])).toBeCloseTo(0.3)
   })
 })
 

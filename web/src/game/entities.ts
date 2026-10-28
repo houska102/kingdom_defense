@@ -49,6 +49,20 @@ export function describeUnitPassive(passive: UnitPassive): string {
       return `Enemy attack -${passive.amount} when defending`
     case 'enduranceRegen':
       return `+${passive.amount} endurance after fighting`
+    case 'spearWall':
+      return `+${passive.amount} strength per other unit of its kind on the attack`
+    case 'inspiring':
+      return `Events on its attack +${Math.round(passive.amount * 100)}% good chance`
+    case 'lastStand':
+      return `+${passive.amount} strength at 1 HP`
+    case 'paidBlade':
+      return `Costs ${passive.upkeep} gold per turn, leaves when unpaid`
+    case 'flanker':
+      return `+${passive.amount} strength on tiles exposed from 2+ sides`
+    case 'bloodlust':
+      return `+${passive.amount} strength per unit fallen this city`
+    case 'banner':
+      return `+${passive.amount} strength to others on its attack`
   }
 }
 

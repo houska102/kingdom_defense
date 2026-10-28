@@ -40,6 +40,7 @@ Decisions made (first prototype - single city):
     - prebuilt tiles are placed by x/y on that city's grid
 - default buildings: Keep, Wall x3, House x4, Watchtower x2, Barracks
 - default garrison: choose 3 of 5 (Militia, Spearmen, Knights, Archers, Veterans)
+    - plus Sellswords as a free extra pick (see unit passives), they dont count toward the pool size for picks
     - each unit has strength, health, endurance and maybe a passive
 - combat order: passives reduce attack -> tile defense -> garrison strength -> tile health
     - multiple garrisons on one attack split the absorbed damage by strength ratio (rounded to whole numbers)
@@ -146,7 +147,25 @@ Campaign (10 cities):
     - Infirmary (1 def, 4 HP): while standing all garrison heals 1 HP at the end of each turn
     - unique tiles (Infirmary, Militia Center, Chapel, Last Bastion, Mercenary Camp, Granary) can only be unlocked once, max 1 in the palette
         - once unlocked (or picked earlier in the same city) they stop being offered
-- unlockable units: Crossbowmen, Paladins, Longbowmen, Wardens
+- unlockable units: Crossbowmen, Paladins, Longbowmen, Wardens, Captain, Barbarian Berserkers, Skirmishers, Warlord, Standard Bearer
+- unit passives:
+    - Archers (2 str, 2 HP, 2 end) - the attack they defend is 1 weaker
+    - Veterans (3 str, 4 HP, 3 end) - regain +1 endurance after fighting
+    - Spearmen (3 str, 3 HP, 3 end) - Spear Wall: +1 strength for each other Spearmen on the same attack
+    - Crossbowmen (3 str, 2 HP, 2 end) - the attack they defend is 2 weaker
+    - Longbowmen (2 str, 3 HP, 3 end) - the attack they defend is 1 weaker
+    - Wardens (3 str, 5 HP, 2 end) - regain +1 endurance after fighting
+    - Militia, Knights and Paladins have no passive
+    - Captain (2 str, 4 HP, 3 end) - Inspiring: events on its attack are 15% more likely to be good, stacks
+    - Barbarian Berserkers (3 str, 4 HP, 1 end) - Last Stand: +2 strength while at 1 HP
+    - Sellswords (4 str, 3 HP, 2 end) - Paid Blade:
+        - free pick, doesnt use a garrison pick slot
+        - can only be picked with at least 1 gold (so never in the first city)
+        - costs 1 gold at the end of each turn (after income), leaves when the treasury cant pay
+        - can also come from mercenary hire, recruit cards and Wandering Sellswords, same upkeep
+    - Skirmishers (2 str, 3 HP, 3 end) - Flanker: +2 strength when the defended tile is exposed from more than one side
+    - Warlord (4 str, 5 HP, 2 end) - Bloodlust: +1 strength for each unit that died in this city
+    - Standard Bearer (1 str, 4 HP, 3 end) - Banner: +1 strength to every other unit on the same attack, stacks
 - Gold:
     - campaign-wide treasury, starts at 0 and carries over between cities
     - earned from tile passives (Mercenary Camp) and the Tribute card

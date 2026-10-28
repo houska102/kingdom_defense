@@ -36,6 +36,7 @@ const makeState = (): GameState => {
     pendingCard: null,
     unlocks: [],
     fallReason: null,
+    fallenUnits: 0,
     cityIndex: 0,
     cityResults: [],
     tileUnlocks: {},

@@ -6,17 +6,21 @@ import {
   garrisonPicks,
   garrisonPool,
   gridSizeFor,
+  isFreePick,
   mergeUnlocks,
   newCampaign,
+  payUpkeep,
+  upkeepOf,
 } from './campaign'
 import {
   ALL_TILE_DEFS,
+  ALL_UNIT_DEFS,
   CITY_CONFIGS,
   DEFAULT_PALETTE,
   UNLOCKABLE_TILES,
   UNLOCKABLE_UNITS,
 } from './data'
-import { createTile } from './entities'
+import { createTile, createUnit } from './entities'
 import { createRng } from './rng'
 import type { Card } from './types'
 
@@ -66,6 +70,31 @@ describe('garrisonPicks', () => {
     expect(garrisonPicks(7)).toBe(4)
     expect(garrisonPicks(9)).toBe(5)
     expect(garrisonPicks(1)).toBe(3)
+  })
+})
+
+describe('Sellswords upkeep', () => {
+  const ids = { nextId: 0 }
+  const sellswords = () => createUnit(ids, ALL_UNIT_DEFS.sellswords)
+
+  it('are a free pick with upkeep', () => {
+    expect(isFreePick(ALL_UNIT_DEFS.sellswords)).toBe(true)
+    expect(isFreePick(ALL_UNIT_DEFS.militia)).toBe(false)
+    expect(upkeepOf(ALL_UNIT_DEFS.sellswords)).toBe(1)
+    expect(upkeepOf(ALL_UNIT_DEFS.militia)).toBe(0)
+  })
+
+  it('pays in order and dismisses the ones it cannot pay', () => {
+    const militia = createUnit(ids, ALL_UNIT_DEFS.militia)
+    const units = [sellswords(), militia, sellswords(), sellswords()]
+    const result = payUpkeep(units, 2)
+    expect(result.gold).toBe(0)
+    expect(result.dismissed).toEqual([units[3]])
+  })
+
+  it('dismisses everyone with an empty treasury', () => {
+    const units = [sellswords()]
+    expect(payUpkeep(units, 0)).toEqual({ gold: 0, dismissed: units })
   })
 })
 

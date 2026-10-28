@@ -13,7 +13,7 @@ import {
 } from './data'
 import { createTile, tilePassives } from './entities'
 import type { Rng } from './rng'
-import type { CampaignProgress, Card, CityConfig, GameState, Tile, UnitDef } from './types'
+import type { CampaignProgress, Card, CityConfig, GameState, Tile, Unit, UnitDef } from './types'
 
 export const cityConfig = (cityIndex: number): CityConfig => CITY_CONFIGS[cityIndex]
 
@@ -39,6 +39,24 @@ export function garrisonPool(unitUnlocks: string[]): UnitDef[] {
 
 export function garrisonPicks(poolSize: number): number {
   return Math.max(MIN_GARRISON_PICKS, Math.floor(poolSize * GARRISON_PICK_RATIO))
+}
+
+/** Gold a unit costs at the end of each turn. */
+export const upkeepOf = (def: UnitDef) => (def.passive?.kind === 'paidBlade' ? def.passive.upkeep : 0)
+
+/** Units with upkeep don't use a garrison pick and don't count toward the pool size for picks. */
+export const isFreePick = (def: UnitDef) => def.passive?.kind === 'paidBlade'
+
+/** Pays upkeep in unit order, units that can't be paid are dismissed. */
+export function payUpkeep(units: Unit[], gold: number): { gold: number; dismissed: Unit[] } {
+  const dismissed: Unit[] = []
+  for (const unit of units) {
+    const cost = upkeepOf(unit.def)
+    if (cost === 0) continue
+    if (gold >= cost) gold -= cost
+    else dismissed.push(unit)
+  }
+  return { gold, dismissed }
 }
 
 /** Folds next-city cards into the campaign unlocks. Unit and unique tile unlocks never duplicate. */
@@ -97,6 +115,7 @@ export function createCity(progress: CampaignProgress, nextId: number, rng: Rng)
     pendingCard: null,
     unlocks: [],
     fallReason: null,
+    fallenUnits: 0,
   }
   for (const p of config.prebuilt) {
     const tile = createTile(state, ALL_TILE_DEFS[p.defId], p.y * state.gridSize + p.x)

@@ -73,7 +73,8 @@ export const UNIT_DEFS: Record<string, UnitDef> = {
     strength: 3,
     health: 3,
     endurance: 3,
-    description: 'Reliable line infantry.',
+    passive: { kind: 'spearWall', amount: 1 },
+    description: 'Spear Wall: +1 strength for each other Spearmen on the same attack.',
   },
   knights: {
     id: 'knights',
@@ -100,6 +101,16 @@ export const UNIT_DEFS: Record<string, UnitDef> = {
     endurance: 3,
     passive: { kind: 'enduranceRegen', amount: 1 },
     description: 'Regain +1 endurance after fighting.',
+  },
+  sellswords: {
+    id: 'sellswords',
+    name: 'Sellswords',
+    strength: 4,
+    health: 3,
+    endurance: 2,
+    passive: { kind: 'paidBlade', upkeep: 1 },
+    description:
+      "Paid Blade: free pick, but cost 1 gold per turn and leave when you can't pay. Needs 1 gold to hire.",
   },
 }
 
@@ -220,6 +231,51 @@ export const UNLOCKABLE_UNITS: UnitDef[] = [
     endurance: 2,
     passive: { kind: 'enduranceRegen', amount: 1 },
     description: 'Regain +1 endurance after fighting.',
+  },
+  {
+    id: 'captain',
+    name: 'Captain',
+    strength: 2,
+    health: 4,
+    endurance: 3,
+    passive: { kind: 'inspiring', amount: 0.15 },
+    description: 'Inspiring: events on the attack they defend are 15% more likely to be good.',
+  },
+  {
+    id: 'berserkers',
+    name: 'Barbarian Berserkers',
+    strength: 3,
+    health: 4,
+    endurance: 1,
+    passive: { kind: 'lastStand', amount: 2 },
+    description: 'Last Stand: +2 strength while at 1 HP.',
+  },
+  {
+    id: 'skirmishers',
+    name: 'Skirmishers',
+    strength: 2,
+    health: 3,
+    endurance: 3,
+    passive: { kind: 'flanker', amount: 2 },
+    description: 'Flanker: +2 strength when the tile they defend is exposed from more than one side.',
+  },
+  {
+    id: 'warlord',
+    name: 'Warlord',
+    strength: 4,
+    health: 5,
+    endurance: 2,
+    passive: { kind: 'bloodlust', amount: 1 },
+    description: 'Bloodlust: +1 strength for each unit that died in this city.',
+  },
+  {
+    id: 'standardBearer',
+    name: 'Standard Bearer',
+    strength: 1,
+    health: 4,
+    endurance: 3,
+    passive: { kind: 'banner', amount: 1 },
+    description: 'Banner: +1 strength to every other unit on the same attack.',
   },
 ]
 
