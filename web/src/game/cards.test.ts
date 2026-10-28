@@ -148,6 +148,21 @@ describe('applyCard', () => {
     expect(tile.health).toBe(tile.def.health)
   })
 
+  it('adds gold to the treasury', () => {
+    const state = makeState()
+    state.gold = 2
+    const card: Card = {
+      id: 'c',
+      name: '',
+      description: '',
+      target: null,
+      effect: { kind: 'gainGold', amount: 3 },
+      nextCity: false,
+    }
+    expect(applyCard(state, card)).toBe(true)
+    expect(state.gold).toBe(5)
+  })
+
   it('records next-city cards in unlocks', () => {
     const state = makeState()
     const card: Card = {

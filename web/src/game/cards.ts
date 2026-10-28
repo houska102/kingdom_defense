@@ -82,6 +82,20 @@ const TEMPLATES: CardTemplate[] = [
     },
   },
   {
+    nextCity: false,
+    make: (state, rng) => {
+      const amount = rng.int(1, 3)
+      return {
+        id: nextId(state, 'card'),
+        name: `Tribute (${amount} gold)`,
+        description: `Gain ${amount} gold.`,
+        target: null,
+        effect: { kind: 'gainGold', amount },
+        nextCity: false,
+      }
+    },
+  },
+  {
     nextCity: true,
     available: (state) => offerableTiles(state).length > 0,
     make: (state, rng) => {
@@ -155,6 +169,9 @@ export function applyCard(state: GameState, card: Card, targetId?: string): bool
     }
     case 'recruitUnit':
       state.units.push(createUnit(state, effect.unit))
+      return true
+    case 'gainGold':
+      state.gold += effect.amount
       return true
     case 'unlockTile':
     case 'unlockUnit':

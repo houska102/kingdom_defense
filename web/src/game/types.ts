@@ -103,6 +103,7 @@ export type CardEffect =
   | { kind: 'fortifyTile'; amount: number }
   | { kind: 'restUnit'; heal: number }
   | { kind: 'recruitUnit'; unit: UnitDef }
+  | { kind: 'gainGold'; amount: number }
   | { kind: 'unlockTile'; tile: TileDef }
   | { kind: 'unlockUnit'; unit: UnitDef }
 
