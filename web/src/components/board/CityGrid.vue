@@ -97,4 +97,11 @@ $side-banner-width: 48px;
 .battlefield.dense .city-grid {
   gap: 6px;
 }
+
+@media (max-width: 900px) {
+  .city-grid,
+  .battlefield.dense .city-grid {
+    gap: 4px;
+  }
+}
 </style>

@@ -4,6 +4,7 @@ import CityGrid from '@/components/board/CityGrid.vue'
 import SetupHint from '@/components/board/SetupHint.vue'
 import GameHeader from '@/components/layout/GameHeader.vue'
 import EventModal from '@/components/modals/EventModal.vue'
+import MobileGame from '@/components/mobile/MobileGame.vue'
 import AttackPanel from '@/components/panels/AttackPanel.vue'
 import BattleEventsPanel from '@/components/panels/BattleEventsPanel.vue'
 import CardDraft from '@/components/panels/CardDraft.vue'
@@ -14,6 +15,7 @@ import TurnLog from '@/components/panels/TurnLog.vue'
 import UnlocksPanel from '@/components/panels/UnlocksPanel.vue'
 import UnitPicker from '@/components/units/UnitPicker.vue'
 import UnitRoster from '@/components/units/UnitRoster.vue'
+import { useMobile } from '@/composables/useMobile'
 import {
   assignSelectedUnit,
   attackOnTile,
@@ -27,6 +29,8 @@ import {
   state,
   tileAt,
 } from '@/game/store'
+
+const mobile = useMobile()
 
 const cityOver = computed(() => state.phase === 'cityFallen' || state.phase === 'campaignOver')
 
@@ -66,7 +70,9 @@ function onUnitClick(unitId: string) {
 </script>
 
 <template>
-  <main class="app" :class="{ wide: !cityOver }">
+  <MobileGame v-if="mobile" />
+
+  <main v-else class="app" :class="{ wide: !cityOver }">
     <GameHeader />
 
     <div
@@ -111,9 +117,9 @@ function onUnitClick(unitId: string) {
         <TurnLog />
       </aside>
     </div>
-
-    <EventModal />
   </main>
+
+  <EventModal />
 </template>
 
 <style lang="scss" scoped>

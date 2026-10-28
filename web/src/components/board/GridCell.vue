@@ -224,4 +224,43 @@ const title = computed(
     right: 4px;
   }
 }
+
+@media (max-width: 900px) {
+  .cell {
+    gap: 2px;
+    padding: 4px;
+    font-size: 12px;
+
+    .defense {
+      font-size: 10px;
+    }
+  }
+
+  .cell.dense {
+    padding: 3px;
+    font-size: 10px;
+
+    .defense,
+    .reduction {
+      display: none;
+    }
+
+    .attack-badge,
+    .defenders-badge,
+    .prebuilt-badge {
+      top: 2px;
+      padding: 0 3px;
+      font-size: 9px;
+    }
+
+    .attack-badge {
+      right: 2px;
+    }
+
+    .defenders-badge,
+    .prebuilt-badge {
+      left: 2px;
+    }
+  }
+}
 </style>

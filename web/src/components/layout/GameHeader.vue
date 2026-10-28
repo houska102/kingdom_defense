@@ -36,5 +36,21 @@ header {
     font-size: 18px;
     color: $color-accent;
   }
+
+  @media (max-width: 900px) {
+    flex-wrap: wrap;
+    gap: $spacing;
+
+    h1 {
+      width: 100%;
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .turn,
+    .gold {
+      font-size: 14px;
+    }
+  }
 }
 </style>

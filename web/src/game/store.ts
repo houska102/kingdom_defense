@@ -178,12 +178,11 @@ export function selectTileDef(defId: string | null) {
   state.selectedTileDefId = state.selectedTileDefId === defId ? null : defId
 }
 
-export function placeTile(cell: number) {
-  const defId = state.selectedTileDefId
+export function placeTile(cell: number, defId = state.selectedTileDefId) {
   if (!defId || tileAt(cell) || (state.palette[defId] ?? 0) <= 0) return
   state.tiles.push(createTile(state, ALL_TILE_DEFS[defId], cell))
   state.palette[defId]--
-  if (state.palette[defId] === 0) state.selectedTileDefId = null
+  if (state.palette[defId] === 0 && state.selectedTileDefId === defId) state.selectedTileDefId = null
 }
 
 export function removeTile(cell: number) {
@@ -271,12 +270,19 @@ export function unassignUnit(unitId: string) {
   }
 }
 
-export function assignSelectedUnit(attackId: string) {
-  const unitId = state.selectedUnitId
-  if (state.phase !== 'assign' || !unitId || !state.assignments[attackId]) return
+export function assignUnit(unitId: string, attackId: string) {
+  if (state.phase !== 'assign' || !unitById(unitId) || !state.assignments[attackId]) return
   unassignUnit(unitId)
   state.assignments[attackId].push(unitId)
   state.selectedUnitId = null
+}
+
+export function assignSelectedUnit(attackId: string) {
+  if (state.selectedUnitId) assignUnit(state.selectedUnitId, attackId)
+}
+
+export function cancelPendingCard() {
+  state.pendingCard = null
 }
 
 /** Adds a line to the current turn's battle log entry. */
