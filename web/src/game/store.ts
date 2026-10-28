@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { exposedSides, generateAttacks } from './attacks'
-import { battleTotal, describeBattleEffect } from './battleEvents'
+import { PREVENT_BATTLE_EVENT_COST, battleTotal, describeBattleEffect } from './battleEvents'
 import {
   bonusRecruits,
   cityConfig,
@@ -117,12 +117,28 @@ function resolveWithEvent(attack: Attack, triggered?: TriggeredEvent): CombatRes
 
 export const currentEvent = (): TriggeredEvent | undefined => state.pendingEvents[state.eventIndex]
 
-/** Battle event waiting to be shown in the setup modal. */
+/** Battle event waiting to be shown in the setup modal. The first city skips the modals. */
 export const currentBattleEvent = (): BattleEvent | undefined =>
-  state.phase === 'setup' ? state.battleEvents[state.battleEventIndex] : undefined
+  state.phase === 'setup' && state.cityIndex > 0
+    ? state.battleEvents[state.battleEventIndex]
+    : undefined
 
 export function acknowledgeBattleEvent() {
   if (currentBattleEvent()) state.battleEventIndex++
+}
+
+/** The bad omen shown in the setup modal can be bought off before its effects apply. */
+export function canPreventBattleEvent(): boolean {
+  const event = currentBattleEvent()
+  return !!event && !event.good && state.gold >= PREVENT_BATTLE_EVENT_COST
+}
+
+export function preventBattleEvent() {
+  const event = currentBattleEvent()
+  if (!event || !canPreventBattleEvent()) return
+  state.battleEvents.splice(state.battleEventIndex, 1)
+  state.gold -= PREVENT_BATTLE_EVENT_COST
+  logLine(`Prevented [${event.title}] for ${PREVENT_BATTLE_EVENT_COST} gold.`)
 }
 
 export interface EventImpact {

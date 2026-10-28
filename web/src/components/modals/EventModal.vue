@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { describeBattleEffect } from '@/game/battleEvents'
+import { PREVENT_BATTLE_EVENT_COST, describeBattleEffect } from '@/game/battleEvents'
 import { describeEffect } from '@/game/events'
 import {
   acknowledgeBattleEvent,
   acknowledgeEvent,
+  canPreventBattleEvent,
   currentBattleEvent,
   currentCity,
   currentEvent,
   eventImpact,
+  preventBattleEvent,
   state,
 } from '@/game/store'
 
@@ -55,9 +57,24 @@ const event = computed(() => battleEvent.value ?? triggered.value?.event)
         <span v-else class="counter">
           Event {{ state.eventIndex + 1 }} of {{ state.pendingEvents.length }}
         </span>
-        <button class="btn" @click="battleEvent ? acknowledgeBattleEvent() : acknowledgeEvent()">
-          Continue
-        </button>
+        <div class="actions">
+          <button
+            v-if="battleEvent && !battleEvent.good"
+            class="btn"
+            :disabled="!canPreventBattleEvent()"
+            :title="
+              state.gold < PREVENT_BATTLE_EVENT_COST
+                ? `Need ${PREVENT_BATTLE_EVENT_COST - state.gold} more gold.`
+                : undefined
+            "
+            @click="preventBattleEvent"
+          >
+            Prevent ({{ PREVENT_BATTLE_EVENT_COST }} gold)
+          </button>
+          <button class="btn" @click="battleEvent ? acknowledgeBattleEvent() : acknowledgeEvent()">
+            Continue
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -142,6 +159,11 @@ const event = computed(() => battleEvent.value ?? triggered.value?.event)
   .counter {
     font-size: 13px;
     color: $color-muted;
+  }
+
+  .actions {
+    display: flex;
+    gap: $spacing;
   }
 }
 </style>

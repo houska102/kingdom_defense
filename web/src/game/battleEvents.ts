@@ -4,6 +4,7 @@ import type { BattleEffect, BattleEffectKind, BattleEvent } from './types'
 export const MIN_BATTLE_EVENTS = 2
 export const MAX_BATTLE_EVENTS = 3
 export const GOOD_BATTLE_EVENT_CHANCE = 0.5
+export const PREVENT_BATTLE_EVENT_COST = 4
 
 export const BATTLE_EVENT_DEFS: BattleEvent[] = [
   {
