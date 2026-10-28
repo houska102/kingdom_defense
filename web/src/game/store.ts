@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { exposedSides, generateAttacks } from './attacks'
+import { battleTotal, describeBattleEffect } from './battleEvents'
 import {
   bonusRecruits,
   cityConfig,
@@ -25,6 +26,8 @@ import { EVENT_CHANCE, eventModifiers, goodEventChance, rollEvents } from './eve
 import { createRng, type Rng } from './rng'
 import type {
   Attack,
+  BattleEffectKind,
+  BattleEvent,
   Card,
   Direction,
   GameState,
@@ -42,7 +45,9 @@ export const state = reactive<GameState>(newCampaign(rng))
 
 export const currentCity = () => cityConfig(state.cityIndex)
 export const garrisonPool = (): UnitDef[] => poolForUnlocks(state.unitUnlocks)
-export const garrisonPicks = (): number => picksForPool(garrisonPool().length)
+export const battleModifier = (kind: BattleEffectKind) => battleTotal(state.battleEvents, kind)
+export const garrisonPicks = (): number =>
+  Math.max(1, picksForPool(garrisonPool().length) + battleModifier('garrisonPicks'))
 export const totalTurns = () => state.cityResults.reduce((sum, r) => sum + r.turns, 0)
 
 export const tileAt = (cell: number) => state.tiles.find((t) => t.cell === cell)
@@ -111,6 +116,14 @@ function resolveWithEvent(attack: Attack, triggered?: TriggeredEvent): CombatRes
 }
 
 export const currentEvent = (): TriggeredEvent | undefined => state.pendingEvents[state.eventIndex]
+
+/** Battle event waiting to be shown in the setup modal. */
+export const currentBattleEvent = (): BattleEvent | undefined =>
+  state.phase === 'setup' ? state.battleEvents[state.battleEventIndex] : undefined
+
+export function acknowledgeBattleEvent() {
+  if (currentBattleEvent()) state.battleEventIndex++
+}
 
 export interface EventImpact {
   tile: Tile
@@ -181,7 +194,35 @@ export function startCity() {
   ].map((def) => createUnit(state, def))
   state.selectedTileDefId = null
   state.turn = 1
+  applyBattleEvents()
   beginTurn()
+}
+
+/** Applies the one-time effects of the battle events and the battle-long tile defense. */
+function applyBattleEvents() {
+  for (const event of state.battleEvents) {
+    const effect = event.effect
+    switch (effect.kind) {
+      case 'gold':
+        state.gold += effect.amount
+        break
+      case 'recruits':
+        for (let i = 0; i < effect.amount; i++) {
+          state.units.push(createUnit(state, rng.pick(Object.values(ALL_UNIT_DEFS))))
+        }
+        break
+      case 'unitHealthLoss':
+        for (const unit of state.units) unit.health = Math.max(1, unit.health - effect.amount)
+        break
+      case 'tileDamage':
+        for (const tile of rng.shuffle(state.tiles).slice(0, effect.count)) {
+          tile.health = Math.max(1, tile.health - effect.amount)
+        }
+        break
+    }
+    logLine(`[${event.title}] ${describeBattleEffect(effect)}.`)
+  }
+  for (const tile of state.tiles) tile.bonusDefense = battleModifier('tileDefense')
 }
 
 // Turn actions
@@ -194,7 +235,8 @@ function beginTurn() {
     () => nextId(state, 'attack'),
     state.attackDirection,
     state.gridSize,
-    currentCity().attackBonus,
+    currentCity().attackBonus + battleModifier('attackBonus'),
+    battleModifier('extraAttacks'),
   )
   state.assignments = Object.fromEntries(state.attacks.map((a) => [a.id, []]))
   state.selectedUnitId = null
@@ -254,7 +296,11 @@ export function endTurn() {
   if (state.phase !== 'assign') return
   state.selectedUnitId = null
   const defended = state.attacks.filter((a) => (state.assignments[a.id]?.length ?? 0) > 0)
-  state.pendingEvents = rollEvents(defended, rng, EVENT_CHANCE, goodEventChance(state.tiles))
+  const goodChance = Math.min(
+    1,
+    Math.max(0, goodEventChance(state.tiles) + battleModifier('goodEventChance')),
+  )
+  state.pendingEvents = rollEvents(defended, rng, EVENT_CHANCE, goodChance)
   state.eventIndex = 0
   if (state.pendingEvents.length > 0) state.phase = 'event'
   else applyResolution()
@@ -313,7 +359,7 @@ function applyResolution() {
     }
   }
 
-  for (const tile of state.tiles) tile.bonusDefense = 0
+  for (const tile of state.tiles) tile.bonusDefense = battleModifier('tileDefense')
 
   for (const line of lines) logLine(line)
   state.attacks = []
@@ -329,7 +375,7 @@ function applyResolution() {
     return
   }
 
-  state.draft = rollDraft(state, rng, draftSize(state.tiles))
+  state.draft = rollDraft(state, rng, draftSize(state.tiles) + battleModifier('draftSize'))
   state.pendingCard = null
   state.phase = 'draft'
 }

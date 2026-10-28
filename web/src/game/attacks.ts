@@ -129,7 +129,7 @@ export function isLaneAnchored(
 /**
  * Creates this turn's attacks, at most one per living tile, filling exposed tiles (front line
  * and open flanks) first and spilling deeper. When there are more attacks than living tiles,
- * the extra attacks merge into existing ones.
+ * the extra attacks merge into existing ones. `extraAttacks` is added on top of the grid cap.
  */
 export function generateAttacks(
   turn: number,
@@ -139,6 +139,7 @@ export function generateAttacks(
   direction: Direction,
   gridSize: number,
   bonus = 0,
+  extraAttacks = 0,
 ): Attack[] {
   const standing = tiles.filter((t) => t.health > 0)
   if (standing.length === 0) return []
@@ -147,7 +148,7 @@ export function generateAttacks(
 
   const rollStrength = () =>
     Math.max(1, Math.round(baseAttackStrength(turn, bonus) + rng.int(-1, 1)))
-  const count = attackCount(turn, gridSize)
+  const count = attackCount(turn, gridSize) + extraAttacks
 
   const reachable = reachableOpenCells(tiles, direction, gridSize)
   const byRank = new Map<number, Tile[]>()

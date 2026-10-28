@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AttackPanel from '@/components/AttackPanel.vue'
+import BattleEventsPanel from '@/components/BattleEventsPanel.vue'
 import CardDraft from '@/components/CardDraft.vue'
 import CityGrid from '@/components/CityGrid.vue'
 import EventModal from '@/components/EventModal.vue'
@@ -114,6 +115,8 @@ function onUnitClick(unitId: string) {
       </div>
 
       <aside class="side">
+        <BattleEventsPanel v-if="!cityOver" />
+
         <template v-if="state.phase === 'setup'">
           <TilePalette />
           <button class="btn" :disabled="!canStartCity()" @click="startCity">Defend the city</button>

@@ -53,7 +53,7 @@ export function describeUnitPassive(passive: UnitPassive): string {
 }
 
 export function tileDefense(tile: Tile): number {
-  return tile.def.defense + tile.bonusDefense
+  return Math.max(0, tile.def.defense + tile.bonusDefense)
 }
 
 export function isAdjacent(a: number, b: number, gridSize: number): boolean {

@@ -27,6 +27,8 @@ const makeState = (): GameState => {
     attacks: [],
     assignments: {},
     selectedUnitId: null,
+    battleEvents: [],
+    battleEventIndex: 0,
     pendingEvents: [],
     eventIndex: 0,
     reports: [],

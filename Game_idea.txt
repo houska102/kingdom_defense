@@ -91,6 +91,30 @@ Events:
     - Mud and Rain - attack -3
     - Rallying Cry - each defender +1 strength
 
+Battle events:
+
+- every city rolls 2-3 battle events when its setup starts, they last for the whole defense of that city
+    - pop up one by one as a modal (like normal events) when setup starts, so the layout and garrison can be planned around them
+    - afterwards they stay listed in the side panel for the rest of the city
+    - each event is 50% good / 50% bad, never two events of the same kind (so +1 and -1 attack cant both roll)
+    - one-time effects (gold, units, damage) are applied when pressing "Defend the city" and written to the battle log
+- good:
+    - Famine in the Enemy Camp - every attack -1
+    - Master Masons - every tile +1 defense
+    - Volunteers - +1 garrison pick
+    - War Chest - +3 gold
+    - Favorable Omens - per-attack events +15% good chance
+    - Royal Envoy - +1 card in every card pick
+    - Wandering Sellswords - +1 random unit (locked ones included)
+- bad:
+    - Veteran Horde - every attack +1
+    - Rotten Timber - every tile -1 defense (never below 0)
+    - Second Army - +1 attack every turn, on top of the grid width cap
+    - Desertion - -1 garrison pick
+    - Ill Omens - per-attack events -20% good chance
+    - Camp Fever - every unit starts with -1 HP (never below 1)
+    - Earthquake - 2 random tiles start with -2 HP (never below 1)
+
 Campaign (10 cities):
 
 - each city is played until it falls, then you march to the next one

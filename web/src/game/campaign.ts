@@ -1,4 +1,5 @@
 import { DIRECTIONS } from './attacks'
+import { rollBattleEvents } from './battleEvents'
 import {
   ALL_TILE_DEFS,
   ALL_UNIT_DEFS,
@@ -87,6 +88,8 @@ export function createCity(progress: CampaignProgress, nextId: number, rng: Rng)
     attacks: [],
     assignments: {},
     selectedUnitId: null,
+    battleEvents: rollBattleEvents(rng),
+    battleEventIndex: 0,
     pendingEvents: [],
     eventIndex: 0,
     reports: [],

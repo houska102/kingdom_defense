@@ -1,20 +1,39 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { describeBattleEffect } from '@/game/battleEvents'
 import { describeEffect } from '@/game/events'
-import { acknowledgeEvent, currentEvent, eventImpact, state } from '@/game/store'
+import {
+  acknowledgeBattleEvent,
+  acknowledgeEvent,
+  currentBattleEvent,
+  currentCity,
+  currentEvent,
+  eventImpact,
+  state,
+} from '@/game/store'
 
-const triggered = computed(() => currentEvent())
+const battleEvent = computed(() => currentBattleEvent())
+const triggered = computed(() => (state.phase === 'event' ? currentEvent() : undefined))
 const impact = computed(() => (triggered.value ? eventImpact(triggered.value) : undefined))
+const event = computed(() => battleEvent.value ?? triggered.value?.event)
 </script>
 
 <template>
-  <div v-if="state.phase === 'event' && triggered" class="backdrop">
-    <div class="modal" :class="triggered.event.good ? 'good' : 'bad'" role="dialog">
-      <span class="tag">{{ triggered.event.good ? 'Fortune favors you' : 'Misfortune strikes' }}</span>
-      <h2>{{ triggered.event.title }}</h2>
-      <p class="text">{{ triggered.event.text }}</p>
+  <div v-if="event" class="backdrop">
+    <div class="modal" :class="event.good ? 'good' : 'bad'" role="dialog">
+      <span class="tag">
+        <template v-if="battleEvent">{{ event.good ? 'A good omen' : 'A bad omen' }}</template>
+        <template v-else>{{ event.good ? 'Fortune favors you' : 'Misfortune strikes' }}</template>
+      </span>
+      <h2>{{ event.title }}</h2>
+      <p class="text">{{ event.text }}</p>
 
-      <div v-if="impact" class="impact">
+      <div v-if="battleEvent" class="impact">
+        <div class="effect">{{ describeBattleEffect(battleEvent.effect) }}</div>
+        <div>Lasts for the whole defense of {{ currentCity().name }}.</div>
+      </div>
+
+      <div v-else-if="triggered && impact" class="impact">
         <div class="effect">{{ describeEffect(triggered.event) }} on {{ impact.tile.def.name }}</div>
         <div v-if="impact.attackBefore !== impact.attackAfter">
           Attack on {{ impact.tile.def.name }}: {{ impact.attackBefore }} -> {{ impact.attackAfter }}
@@ -30,8 +49,15 @@ const impact = computed(() => (triggered.value ? eventImpact(triggered.value) : 
       </div>
 
       <div class="footer">
-        <span class="counter">Event {{ state.eventIndex + 1 }} of {{ state.pendingEvents.length }}</span>
-        <button class="btn" @click="acknowledgeEvent">Continue</button>
+        <span v-if="battleEvent" class="counter">
+          Omen {{ state.battleEventIndex + 1 }} of {{ state.battleEvents.length }}
+        </span>
+        <span v-else class="counter">
+          Event {{ state.eventIndex + 1 }} of {{ state.pendingEvents.length }}
+        </span>
+        <button class="btn" @click="battleEvent ? acknowledgeBattleEvent() : acknowledgeEvent()">
+          Continue
+        </button>
       </div>
     </div>
   </div>

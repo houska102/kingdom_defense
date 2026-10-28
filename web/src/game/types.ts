@@ -138,6 +138,36 @@ export interface TriggeredEvent {
   event: GameEvent
 }
 
+export type BattleEffect =
+  /** Added to every attack of the battle. */
+  | { kind: 'attackBonus'; amount: number }
+  /** Added to every tile's defense (floored at 0). */
+  | { kind: 'tileDefense'; amount: number }
+  /** Extra attacks every turn. */
+  | { kind: 'extraAttacks'; amount: number }
+  | { kind: 'garrisonPicks'; amount: number }
+  /** Gold granted when the defense starts. */
+  | { kind: 'gold'; amount: number }
+  /** Added to the chance that a per-attack event is good (0.1 = +10%). */
+  | { kind: 'goodEventChance'; amount: number }
+  | { kind: 'draftSize'; amount: number }
+  /** Random units (locked ones included) added when the defense starts. */
+  | { kind: 'recruits'; amount: number }
+  /** Health every unit loses when the defense starts (never below 1). */
+  | { kind: 'unitHealthLoss'; amount: number }
+  /** `count` random tiles lose `amount` health when the defense starts (never below 1). */
+  | { kind: 'tileDamage'; amount: number; count: number }
+
+export type BattleEffectKind = BattleEffect['kind']
+
+export interface BattleEvent {
+  id: string
+  title: string
+  text: string
+  good: boolean
+  effect: BattleEffect
+}
+
 export type Phase = 'setup' | 'assign' | 'event' | 'draft' | 'cityFallen' | 'campaignOver'
 
 export interface TurnReport {
@@ -173,6 +203,10 @@ export interface GameState extends CampaignProgress {
   /** attackId -> unitIds */
   assignments: Record<string, string[]>
   selectedUnitId: string | null
+  /** Rolled when the city is created, affect the whole defense of the city. */
+  battleEvents: BattleEvent[]
+  /** Battle events already shown in the setup modal. */
+  battleEventIndex: number
   pendingEvents: TriggeredEvent[]
   eventIndex: number
   reports: TurnReport[]

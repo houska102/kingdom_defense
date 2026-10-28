@@ -151,6 +151,18 @@ describe('createCity', () => {
     })
   })
 
+  it('rolls 2-3 battle events for every city', () => {
+    CITY_CONFIGS.forEach((_, cityIndex) => {
+      const city = createCity(
+        { cityIndex, cityResults: [], tileUnlocks: {}, unitUnlocks: [], gold: 0 },
+        0,
+        createRng(cityIndex),
+      )
+      expect(city.battleEvents.length).toBeGreaterThanOrEqual(2)
+      expect(city.battleEvents.length).toBeLessThanOrEqual(3)
+    })
+  })
+
   it('grows the grid each third of the campaign', () => {
     const sizes = CITY_CONFIGS.map((_, i) => gridSizeFor(i))
     expect(sizes).toEqual([4, 4, 4, 4, 5, 5, 5, 6, 6, 6])

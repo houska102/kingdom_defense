@@ -96,6 +96,12 @@ describe('generateAttacks', () => {
     expect(attacks.every((a) => a.merged === 0 && !a.deep)).toBe(true)
   })
 
+  it('adds extra attacks on top of the grid cap', () => {
+    const attacks = generateAttacks(20, fullGrid(), createRng(4), idMaker(), 'north', GRID, 0, 1)
+    expect(attacks).toHaveLength(GRID + 1)
+    expect(attacks.filter((a) => a.deep)).toHaveLength(1)
+  })
+
   it('never reaches deeper ranks once attacks are capped at grid width', () => {
     const rng = createRng(11)
     for (let layout = 0; layout < 300; layout++) {
