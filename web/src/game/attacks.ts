@@ -42,7 +42,7 @@ const NEIGHBOR_OFFSETS: Record<Direction, { dx: number; dy: number }> = {
   east: { dx: 1, dy: 0 },
 }
 
-function neighborCell(cell: number, side: Direction, gridSize: number): number | undefined {
+export function neighborCell(cell: number, side: Direction, gridSize: number): number | undefined {
   const x = (cell % gridSize) + NEIGHBOR_OFFSETS[side].dx
   const y = Math.floor(cell / gridSize) + NEIGHBOR_OFFSETS[side].dy
   if (x < 0 || y < 0 || x >= gridSize || y >= gridSize) return undefined

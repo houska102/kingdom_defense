@@ -112,26 +112,22 @@ const title = computed(
   justify-content: flex-end;
   gap: 4px;
   padding: $spacing;
-  border: 2px solid $color-border;
-  border-radius: $radius;
-  background: $color-surface-raised;
+  border: 2px solid transparent;
+  border-radius: 0;
+  /* The city art is drawn on the canvas underneath, this only keeps the stats readable. */
+  background: linear-gradient(to top, rgb(0 0 0 / 65%), transparent 45%);
   color: $color-text;
   font: inherit;
   text-align: left;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 80%);
   cursor: pointer;
 
   &.empty {
-    background: $color-surface;
-    border-style: dashed;
+    background: none;
   }
 
   &.ruined {
-    opacity: 0.4;
-  }
-
-  &.prebuilt {
-    border-style: double;
-    border-width: 4px;
+    opacity: 0.6;
   }
 
   &.attacked {
@@ -140,7 +136,11 @@ const title = computed(
 
   &.active {
     outline: 2px solid $color-accent;
-    outline-offset: 2px;
+    outline-offset: -4px;
+  }
+
+  &:hover {
+    background-color: rgb(255 255 255 / 8%);
   }
 
   .name {

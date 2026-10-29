@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { attackOnTile, state, tileAt } from '@/game/store'
 import AttackBanner from './AttackBanner.vue'
+import CityCanvas from './CityCanvas.vue'
 import GridCell from './GridCell.vue'
 
 const props = defineProps<{
@@ -33,17 +34,20 @@ function isActive(cell: number): boolean {
 <template>
   <div
     class="battlefield"
-    :class="[`from-${state.attackDirection}`, { dense: state.gridSize >= 5 }]"
+    :class="`from-${state.attackDirection}`"
   >
     <AttackBanner class="banner" />
-    <div class="city-grid" :style="{ gridTemplateColumns: `repeat(${state.gridSize}, minmax(0, 1fr))` }">
-      <GridCell
-        v-for="cell in cells"
-        :key="cell"
-        :cell="cell"
-        :active="isActive(cell)"
-        @click="emit('cellClick', cell)"
-      />
+    <div class="city-board">
+      <CityCanvas />
+      <div class="city-grid" :style="{ gridTemplateColumns: `repeat(${state.gridSize}, minmax(0, 1fr))` }">
+        <GridCell
+          v-for="cell in cells"
+          :key="cell"
+          :cell="cell"
+          :active="isActive(cell)"
+          @click="emit('cellClick', cell)"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -88,20 +92,16 @@ $side-banner-width: 48px;
   grid-area: banner;
 }
 
-.city-grid {
+.city-board {
   grid-area: grid;
+  position: relative;
+  aspect-ratio: 1;
+}
+
+/* Cells sit flush so they line up with the canvas cells underneath. */
+.city-grid {
+  position: relative;
   display: grid;
-  gap: $spacing;
-}
-
-.battlefield.dense .city-grid {
-  gap: 6px;
-}
-
-@media (max-width: 900px) {
-  .city-grid,
-  .battlefield.dense .city-grid {
-    gap: 4px;
-  }
+  height: 100%;
 }
 </style>
