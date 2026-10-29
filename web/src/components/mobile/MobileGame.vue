@@ -10,12 +10,14 @@ import UnlocksPanel from '@/components/panels/UnlocksPanel.vue'
 import {
   attackOnTile,
   cancelPendingCard,
+  caravanGold,
   chooseCardTarget,
   endTurn,
   mercenaryCost,
   state,
   tileAt,
 } from '@/game/store'
+import TileInfoModal from '@/components/modals/TileInfoModal.vue'
 import BuildModal from './BuildModal.vue'
 import DefendModal from './DefendModal.vue'
 import DraftModal from './DraftModal.vue'
@@ -28,6 +30,7 @@ const setupStep = ref<'build' | 'garrison'>('build')
 const buildCell = ref<number | null>(null)
 const defendAttackId = ref<string | null>(null)
 const infoPanel = ref<InfoPanel | null>(null)
+const infoTileId = ref<string | null>(null)
 
 watch(
   () => state.phase,
@@ -35,6 +38,7 @@ watch(
     if (phase === 'setup') setupStep.value = 'build'
     buildCell.value = null
     defendAttackId.value = null
+    infoTileId.value = null
   },
 )
 
@@ -54,7 +58,14 @@ const infoButtons = computed(() =>
   (
     [
       ['omens', 'Omens', state.battleEvents.length > 0],
-      ['treasury', 'Treasury', mercenaryCost() !== undefined || state.gold > 0],
+      [
+        'treasury',
+        'Treasury',
+        mercenaryCost() !== undefined ||
+          state.gold > 0 ||
+          state.escapedGold > 0 ||
+          caravanGold() > 0,
+      ],
       ['log', 'Log', state.reports.length > 0],
       ['unlocks', 'Unlocks', state.unlocks.length > 0],
     ] as const
@@ -69,14 +80,15 @@ const gridHighlight = computed(() => {
 
 function onCellClick(cell: number) {
   const tile = tileAt(cell)
-  if (state.phase === 'setup' && setupStep.value === 'build') {
-    buildCell.value = cell
-  } else if (state.phase === 'assign' && tile) {
-    const attack = attackOnTile(tile.id)
-    if (attack) defendAttackId.value = attack.id
-  } else if (tileTargeting.value && tile) {
-    chooseCardTarget(tile.id)
+  if (state.phase === 'setup') {
+    if (setupStep.value === 'build') buildCell.value = cell
+    return
   }
+  if (!tile) return
+  const attack = attackOnTile(tile.id)
+  if (state.phase === 'assign' && attack) defendAttackId.value = attack.id
+  else if (tileTargeting.value) chooseCardTarget(tile.id)
+  else infoTileId.value = tile.id
 }
 </script>
 
@@ -130,6 +142,8 @@ function onCellClick(cell: number) {
     />
 
     <DefendModal v-if="defendAttack" :attack="defendAttack" @close="defendAttackId = null" />
+
+    <TileInfoModal v-if="infoTileId" :tile-id="infoTileId" @close="infoTileId = null" />
 
     <DraftModal v-if="state.phase === 'draft' && !tileTargeting" />
 

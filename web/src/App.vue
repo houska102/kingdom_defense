@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import CityGrid from '@/components/board/CityGrid.vue'
 import SetupHint from '@/components/board/SetupHint.vue'
 import GameHeader from '@/components/layout/GameHeader.vue'
 import EventModal from '@/components/modals/EventModal.vue'
+import TileInfoModal from '@/components/modals/TileInfoModal.vue'
 import MobileGame from '@/components/mobile/MobileGame.vue'
 import AttackPanel from '@/components/panels/AttackPanel.vue'
 import BattleEventsPanel from '@/components/panels/BattleEventsPanel.vue'
@@ -33,6 +34,7 @@ import {
 const mobile = useMobile()
 
 const cityOver = computed(() => state.phase === 'cityFallen' || state.phase === 'campaignOver')
+const inBattle = computed(() => state.phase === 'assign' || state.phase === 'event')
 
 const BOARD_WIDTHS: Record<number, number> = { 4: 600, 5: 690, 6: 760 }
 const boardWidth = computed(() => `${BOARD_WIDTHS[state.gridSize] ?? 600}px`)
@@ -50,16 +52,24 @@ const gridHighlight = computed(() => {
   }
 })
 
+const infoTileId = ref<string | null>(null)
+
+/** Each click does its phase action if it has one, otherwise it shows the building info. */
 function onCellClick(cell: number) {
   const tile = tileAt(cell)
-  if (state.phase === 'setup') {
+  if (state.phase === 'setup' && (!tile || !tile.prebuilt)) {
     if (tile) removeTile(cell)
     else placeTile(cell)
-  } else if (state.phase === 'assign' && tile) {
-    const attack = attackOnTile(tile.id)
-    if (attack) assignSelectedUnit(attack.id)
-  } else if (state.phase === 'draft' && tile && state.pendingCard?.target === 'tile') {
+    return
+  }
+  if (!tile) return
+  const attack = attackOnTile(tile.id)
+  if (state.phase === 'assign' && attack && state.selectedUnitId) {
+    assignSelectedUnit(attack.id)
+  } else if (state.phase === 'draft' && state.pendingCard?.target === 'tile') {
     chooseCardTarget(tile.id)
+  } else {
+    infoTileId.value = tile.id
   }
 }
 
@@ -95,6 +105,15 @@ function onUnitClick(unitId: string) {
       </div>
 
       <aside class="side">
+        <button
+          v-if="inBattle"
+          class="btn"
+          :disabled="state.phase !== 'assign'"
+          @click="endTurn"
+        >
+          End turn
+        </button>
+
         <BattleEventsPanel v-if="!cityOver" />
 
         <template v-if="state.phase === 'setup'">
@@ -102,10 +121,9 @@ function onUnitClick(unitId: string) {
           <button class="btn" :disabled="!canStartCity()" @click="startCity">Defend the city</button>
         </template>
 
-        <template v-else-if="state.phase === 'assign' || state.phase === 'event'">
+        <template v-else-if="inBattle">
           <TreasuryPanel />
           <AttackPanel />
-          <button class="btn" :disabled="state.phase !== 'assign'" @click="endTurn">End turn</button>
         </template>
 
         <CardDraft v-else-if="state.phase === 'draft'" />
@@ -119,6 +137,7 @@ function onUnitClick(unitId: string) {
     </div>
   </main>
 
+  <TileInfoModal v-if="!mobile && infoTileId" :tile-id="infoTileId" @close="infoTileId = null" />
   <EventModal />
 </template>
 
@@ -155,6 +174,8 @@ function onUnitClick(unitId: string) {
   }
 
   .board {
+    position: sticky;
+    top: $spacing * 2;
     grid-row: 1;
     grid-column: 2;
   }
@@ -168,6 +189,7 @@ function onUnitClick(unitId: string) {
     grid-template-columns: minmax(0, 1fr) 380px;
 
     .board {
+      position: static;
       grid-row: 1;
       grid-column: 1;
     }

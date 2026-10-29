@@ -77,6 +77,8 @@ Mobile: the draft opens as a modal.
 - Panel components reused inside the mobile modals: `AttackRow`, `UnitCard`, `UnitPicker`, `UnitRoster`,
   `CardDraft`, `GameOver`, `BattleEventsPanel`, `TreasuryPanel`, `TurnLog`, `UnlocksPanel`, `SetupHint`.
 - `CityGrid` and `GridCell`, with tighter spacing and fonts at 900px or less.
+  The Refugee Caravan's gold is its own badge on the cell, so it stays visible on dense grids
+  where the defense line is hidden.
 
 ## Files
 

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { isCaravan } from '@/game/caravan'
 import { tileDefense } from '@/game/entities'
 import {
   attackOnTile,
   cityReduction,
+  escapeDamage,
   exposedSidesOf,
   previewAttack,
   state,
@@ -11,8 +13,8 @@ import {
   unitsOnAttack,
 } from '@/game/store'
 import type { Direction } from '@/game/types'
+import CaravanBadge from '@/components/caravan/CaravanBadge.vue'
 import StatBar from '@/components/shared/StatBar.vue'
-
 const FRONT_MARKER = 5
 const MARKER_COLOR = '#e0563f'
 const MARKER_OFFSETS: Record<Direction, string> = {
@@ -70,6 +72,9 @@ const title = computed(
       <span class="defense">
         DEF {{ tileDefense(tile) }}
         <em v-if="tile.bonusDefense > 0">(+{{ tile.bonusDefense }})</em>
+        <span v-if="tile.escaping" class="escaping" :class="{ blocked: escapeDamage(tile) > 0 }">
+          {{ escapeDamage(tile) > 0 ? 'escape fails' : 'escaping' }}
+        </span>
       </span>
       <StatBar :value="tile.health" :max="tile.def.health" kind="health" :threat="threat" />
       <span v-if="attack" class="attack-badge" :class="{ merged: attack.merged > 0 }">
@@ -78,6 +83,7 @@ const title = computed(
         <template v-if="attack.deep"> ½</template>
       </span>
       <span v-if="attack && reduction > 0" class="reduction">-{{ reduction }} tower</span>
+      <CaravanBadge v-if="isCaravan(tile)" class="hoard-badge" :tile="tile" />
       <span
         v-if="defenders.length"
         class="defenders-badge"
@@ -149,6 +155,15 @@ const title = computed(
     color: $color-muted;
   }
 
+  .escaping {
+    margin-left: 4px;
+    font-style: italic;
+    color: $color-accent;
+
+    &.blocked {
+      color: $color-attack;
+    }
+  }
   .attack-badge {
     position: absolute;
     top: 6px;
@@ -193,6 +208,15 @@ const title = computed(
     font-size: 10px;
     color: $color-accent;
   }
+
+  .hoard-badge {
+    position: absolute;
+    top: 30px;
+    left: 6px;
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+  }
 }
 
 .cell.dense {
@@ -222,6 +246,12 @@ const title = computed(
   .reduction {
     top: 24px;
     right: 4px;
+  }
+
+  .hoard-badge {
+    top: 24px;
+    left: 4px;
+    font-size: 11px;
   }
 }
 
@@ -260,6 +290,12 @@ const title = computed(
     .defenders-badge,
     .prebuilt-badge {
       left: 2px;
+    }
+
+    .hoard-badge {
+      top: 16px;
+      left: 2px;
+      font-size: 9px;
     }
   }
 }

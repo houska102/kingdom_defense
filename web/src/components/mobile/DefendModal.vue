@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import TileExtras from '@/components/board/TileExtras.vue'
+import TileInfo from '@/components/board/TileInfo.vue'
 import AttackRow from '@/components/panels/AttackRow.vue'
 import UnitCard from '@/components/units/UnitCard.vue'
 import { assignUnit, state, tileById, unassignUnit } from '@/game/store'
@@ -19,6 +21,9 @@ function toggle(unitId: string) {
 
 <template>
   <MobileModal :title="`Defend ${tile?.def.name ?? ''}`" @close="emit('close')">
+    <TileInfo v-if="tile" :tile="tile">
+      <TileExtras :tile="tile" />
+    </TileInfo>
     <AttackRow :attack="attack" />
 
     <h3>Garrison</h3>

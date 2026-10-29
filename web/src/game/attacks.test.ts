@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ESCALATION_TURN,
   attackCount,
   baseAttackStrength,
   exposedSides,
@@ -87,17 +88,47 @@ describe('generateAttacks', () => {
     }
   })
 
-  it('never has more attacks than the grid is wide', () => {
-    expect(attackCount(20, 4)).toBe(4)
-    expect(attackCount(20, 6)).toBe(6)
+  it('never has more attacks than the grid is wide until the escalation turn', () => {
+    expect(attackCount(ESCALATION_TURN, 4)).toBe(4)
+    expect(attackCount(ESCALATION_TURN, 6)).toBe(6)
     expect(attackCount(1, 6)).toBe(2)
-    const attacks = generateAttacks(20, fullGrid(), createRng(4), idMaker(), 'west', GRID)
+    const attacks = generateAttacks(
+      ESCALATION_TURN,
+      fullGrid(),
+      createRng(4),
+      idMaker(),
+      'west',
+      GRID,
+    )
     expect(attacks).toHaveLength(GRID)
     expect(attacks.every((a) => a.merged === 0 && !a.deep)).toBe(true)
   })
 
+  it('adds one attack per turn on top of the grid cap after the escalation turn', () => {
+    expect(attackCount(ESCALATION_TURN + 1, 4)).toBe(5)
+    expect(attackCount(ESCALATION_TURN + 3, 6)).toBe(9)
+    const attacks = generateAttacks(
+      ESCALATION_TURN + 2,
+      fullGrid(),
+      createRng(4),
+      idMaker(),
+      'north',
+      GRID,
+    )
+    expect(attacks).toHaveLength(GRID + 2)
+  })
+
   it('adds extra attacks on top of the grid cap', () => {
-    const attacks = generateAttacks(20, fullGrid(), createRng(4), idMaker(), 'north', GRID, 0, 1)
+    const attacks = generateAttacks(
+      ESCALATION_TURN,
+      fullGrid(),
+      createRng(4),
+      idMaker(),
+      'north',
+      GRID,
+      0,
+      1,
+    )
     expect(attacks).toHaveLength(GRID + 1)
     expect(attacks.filter((a) => a.deep)).toHaveLength(1)
   })
@@ -106,7 +137,7 @@ describe('generateAttacks', () => {
     const rng = createRng(11)
     for (let layout = 0; layout < 300; layout++) {
       const tiles = fullGrid().filter(() => rng.next() < 0.7)
-      for (const attack of generateAttacks(20, tiles, rng, idMaker(), 'north', GRID)) {
+      for (const attack of generateAttacks(ESCALATION_TURN, tiles, rng, idMaker(), 'north', GRID)) {
         expect(attack.deep).toBe(false)
       }
     }
@@ -131,7 +162,14 @@ describe('generateAttacks', () => {
     it('is never attacked while its lane has other standing tiles', () => {
       const tiles = withBastion(fullGrid(), 0)
       for (let seed = 0; seed < 50; seed++) {
-        const attacks = generateAttacks(20, tiles, createRng(seed), idMaker(), 'north', GRID)
+        const attacks = generateAttacks(
+          ESCALATION_TURN,
+          tiles,
+          createRng(seed),
+          idMaker(),
+          'north',
+          GRID,
+        )
         expect(attacks.some((a) => a.tileId === 'tile-0')).toBe(false)
         expect(attacks).toHaveLength(GRID)
       }

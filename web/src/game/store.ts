@@ -14,13 +14,17 @@ import {
   payUpkeep,
   upkeepOf,
 } from './campaign'
+import { caravanGold as caravanGoldOf, fillHoards } from './caravan'
 import { applyCard, draftSize, rollDraft } from './cards'
 import { resolveAttack, type CombatResult, type StrengthContext } from './combat'
 import { ALL_TILE_DEFS, ALL_UNIT_DEFS } from './data'
 import {
   createTile,
   createUnit,
+  escapes,
   isAdjacent,
+  isEscape,
+  maxEndurance,
   nextId,
   passiveTotal,
   tilePassives,
@@ -108,6 +112,7 @@ export function mercenaryCost(): number | undefined {
 }
 
 export const goldIncome = () => passiveTotal(state.tiles, 'goldIncome')
+export const caravanGold = () => caravanGoldOf(state.tiles)
 
 export function canHireMercenary(): boolean {
   const cost = mercenaryCost()
@@ -340,6 +345,35 @@ export function hireMercenary() {
   logLine(`Hired ${def.name} for ${cost} gold.`)
 }
 
+export const canEscape = (tile: Tile) =>
+  state.phase === 'assign' && tile.health > 0 && isEscape(tile)
+
+/** Damage that would stop the tile from escaping this turn with the current defenders, ignoring events. */
+export function escapeDamage(tile: Tile): number {
+  const attack = attackOnTile(tile.id)
+  return attack ? (previewAttack(attack)?.tileDamage ?? 0) : 0
+}
+
+/** Removes the tile from the city, its hoard is kept for the next city. */
+function departTile(tile: Tile) {
+  const gold = tile.hoard ?? 0
+  state.tiles = state.tiles.filter((t) => t.id !== tile.id)
+  state.escapedGold += gold
+  logLine(
+    gold > 0
+      ? `${tile.def.name} escaped with ${gold} gold for the next city.`
+      : `${tile.def.name} escaped.`,
+  )
+}
+
+/** Unattacked tiles leave at once, attacked ones toggle an escape order for the turn's end. */
+export function escapeTile(tileId: string) {
+  const tile = tileById(tileId)
+  if (!tile || !canEscape(tile)) return
+  if (attackOnTile(tile.id)) tile.escaping = !tile.escaping
+  else departTile(tile)
+}
+
 function describeResult(result: CombatResult, tile: Tile, attack: Attack): string {
   const parts = [`${tile.def.name} hit for ${result.incoming}`]
   if (attack.merged > 0) parts[0] += ` (${attack.merged + 1} attacks merged)`
@@ -375,6 +409,7 @@ export function acknowledgeEvent() {
 function applyResolution() {
   const lines: string[] = []
   const fought = new Set<string>()
+  const departing: Tile[] = []
 
   const results = state.attacks.flatMap((attack) => {
     const triggered = state.pendingEvents.find((e) => e.attackId === attack.id)
@@ -395,7 +430,10 @@ function applyResolution() {
     }
     tile.health = Math.max(0, tile.health - result.tileDamage)
     if (tile.health === 0) lines.push(`${tile.def.name} was destroyed!`)
+    if (escapes(tile, result)) departing.push(tile)
+    else if (tile.escaping) lines.push(`${tile.def.name} could not break away.`)
   }
+  for (const tile of state.tiles) delete tile.escaping
 
   const fallen = state.units.filter((u) => u.health === 0)
   for (const unit of fallen) lines.push(`${unit.def.name} fell in battle.`)
@@ -420,17 +458,17 @@ function applyResolution() {
   state.units = state.units.filter((u) => !dismissedIds.has(u.id))
   for (const unit of state.units) {
     unit.health = Math.min(unit.def.health, unit.health + cityHeal)
+    const cap = maxEndurance(unit, state.fallenUnits)
     if (fought.has(unit.id)) {
       const unitRegen = unit.def.passive?.kind === 'enduranceRegen' ? unit.def.passive.amount : 0
-      unit.endurance = Math.min(unit.def.endurance, unit.endurance + 1 + unitRegen + cityRegen)
+      unit.endurance = Math.min(cap, unit.endurance + 1 + unitRegen + cityRegen)
     } else {
-      unit.endurance = unit.def.endurance
+      unit.endurance = cap
     }
   }
 
-  for (const tile of state.tiles) tile.bonusDefense = battleModifier('tileDefense')
-
   for (const line of lines) logLine(line)
+  for (const tile of departing) departTile(tile)
   state.attacks = []
   state.assignments = {}
   state.selectedUnitId = null
@@ -443,6 +481,7 @@ function applyResolution() {
     fallCity(keepLost ? 'The Keep was destroyed.' : 'Every tile was destroyed.')
     return
   }
+  fillHoards(state.tiles)
 
   state.draft = rollDraft(state, rng, draftSize(state.tiles) + battleModifier('draftSize'))
   state.pendingCard = null
@@ -493,7 +532,7 @@ export function nextCity() {
     cityResults: state.cityResults,
     tileUnlocks: state.tileUnlocks,
     unitUnlocks: state.unitUnlocks,
-    gold: state.gold,
+    gold: state.gold + state.escapedGold,
   }
   Object.assign(state, createCity(progress, state.nextId, rng))
 }

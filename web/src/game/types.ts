@@ -15,6 +15,10 @@ export type TilePassive =
   | { kind: 'mercenaryHire'; cost: number }
   /** While standing, the card draft offers `amount` extra cards. */
   | { kind: 'draftBonus'; amount: number }
+  /** Stores `amount` gold for every turn the tile survives. */
+  | { kind: 'goldHoard'; amount: number }
+  /** Can be sent away during the assign phase, taking its hoard to the next city. */
+  | { kind: 'escape' }
 
 export type TilePassiveKind = TilePassive['kind']
 /** Passive kinds that carry a numeric `amount`. */
@@ -72,6 +76,10 @@ export interface Tile {
   bonusDefense: number
   /** Placed by the city config, cannot be removed during setup. */
   prebuilt?: boolean
+  /** Gold stored by `goldHoard` passives. */
+  hoard?: number
+  /** Ordered to escape while attacked, leaves at the end of the turn if it takes no damage. */
+  escaping?: boolean
 }
 
 export interface PrebuiltTile {
@@ -235,4 +243,6 @@ export interface GameState extends CampaignProgress {
   fallReason: string | null
   /** Units that died in the current city. */
   fallenUnits: number
+  /** Gold carried away by escaped tiles, added to the treasury when the next city starts. */
+  escapedGold: number
 }

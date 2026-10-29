@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DRAFT_SIZE, applyCard, draftSize, rollDraft } from './cards'
 import {
   ALL_TILE_DEFS,
+  ALL_UNIT_DEFS,
   CAMPAIGN_LENGTH,
   TILE_DEFS,
   UNIT_DEFS,
@@ -37,6 +38,7 @@ const makeState = (): GameState => {
     unlocks: [],
     fallReason: null,
     fallenUnits: 0,
+    escapedGold: 0,
     cityIndex: 0,
     cityResults: [],
     tileUnlocks: {},
@@ -176,6 +178,40 @@ describe('applyCard', () => {
     }
     applyCard(state, card)
     expect(state.unlocks).toEqual([card])
+  })
+
+  it('fortifies a tile on top of its existing bonus', () => {
+    const state = makeState()
+    const tile = state.tiles[0]
+    tile.bonusDefense = 1
+    const card: Card = {
+      id: 'c',
+      name: '',
+      description: '',
+      target: 'tile',
+      effect: { kind: 'fortifyTile', amount: 1 },
+      nextCity: false,
+    }
+    expect(applyCard(state, card, tile.id)).toBe(true)
+    expect(tile.bonusDefense).toBe(2)
+  })
+
+  it('rests a Warlord up to its raised endurance cap', () => {
+    const state = makeState()
+    const warlord = createUnit(state, ALL_UNIT_DEFS.warlord)
+    warlord.endurance = 0
+    state.units.push(warlord)
+    state.fallenUnits = 2
+    const card: Card = {
+      id: 'c',
+      name: '',
+      description: '',
+      target: 'unit',
+      effect: { kind: 'restUnit', heal: 1 },
+      nextCity: false,
+    }
+    expect(applyCard(state, card, warlord.id)).toBe(true)
+    expect(warlord.endurance).toBe(ALL_UNIT_DEFS.warlord.endurance + 2)
   })
 
   it('rejects a targeted card without a valid target', () => {

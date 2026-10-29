@@ -48,6 +48,15 @@ export const TILE_DEFS: Record<string, TileDef> = {
     passives: [{ kind: 'garrisonRegen', amount: 1 }],
     description: 'While standing, all garrison regains +1 endurance per turn.',
   },
+  refugeeCaravan: {
+    id: 'refugeeCaravan',
+    name: 'Refugee Caravan',
+    defense: 0,
+    health: 2,
+    passives: [{ kind: 'goldHoard', amount: 1 }, { kind: 'escape' }],
+    description:
+      'Gathers 1 gold for every turn it survives. Send it away to bring the gold to the next city, lost if destroyed or the city falls.',
+  },
 }
 
 export const DEFAULT_PALETTE: Record<string, number> = {
@@ -56,6 +65,7 @@ export const DEFAULT_PALETTE: Record<string, number> = {
   house: 4,
   watchtower: 2,
   barracks: 1,
+  refugeeCaravan: 1,
 }
 
 export const UNIT_DEFS: Record<string, UnitDef> = {
@@ -105,9 +115,9 @@ export const UNIT_DEFS: Record<string, UnitDef> = {
   sellswords: {
     id: 'sellswords',
     name: 'Sellswords',
-    strength: 4,
-    health: 3,
-    endurance: 2,
+    strength: 6,
+    health: 5,
+    endurance: 3,
     passive: { kind: 'paidBlade', upkeep: 1 },
     description:
       "Paid Blade: free pick, but cost 1 gold per turn and leave when you can't pay. Needs 1 gold to hire.",
@@ -244,11 +254,11 @@ export const UNLOCKABLE_UNITS: UnitDef[] = [
   {
     id: 'berserkers',
     name: 'Barbarian Berserkers',
-    strength: 3,
+    strength: 5,
     health: 4,
     endurance: 1,
-    passive: { kind: 'lastStand', amount: 2 },
-    description: 'Last Stand: +2 strength while at 1 HP.',
+    passive: { kind: 'lastStand', amount: 3 },
+    description: 'Last Stand: +3 strength while at 1 HP.',
   },
   {
     id: 'skirmishers',
@@ -266,7 +276,7 @@ export const UNLOCKABLE_UNITS: UnitDef[] = [
     health: 5,
     endurance: 2,
     passive: { kind: 'bloodlust', amount: 1 },
-    description: 'Bloodlust: +1 strength for each unit that died in this city.',
+    description: 'Bloodlust: +1 strength and +1 max endurance for each unit that died in this city.',
   },
   {
     id: 'standardBearer',

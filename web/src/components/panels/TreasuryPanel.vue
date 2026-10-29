@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { canHireMercenary, goldIncome, hireMercenary, mercenaryCost, state } from '@/game/store'
+import CaravanTreasury from '@/components/caravan/CaravanTreasury.vue'
+import {
+  canHireMercenary,
+  caravanGold,
+  goldIncome,
+  hireMercenary,
+  mercenaryCost,
+  state,
+} from '@/game/store'
 
 const cost = computed(() => mercenaryCost())
 
@@ -13,12 +21,16 @@ const hireHint = computed(() => {
 </script>
 
 <template>
-  <section v-if="cost !== undefined || state.gold > 0" class="panel">
+  <section
+    v-if="cost !== undefined || state.gold > 0 || state.escapedGold > 0 || caravanGold() > 0"
+    class="panel"
+  >
     <h2>Treasury</h2>
     <p class="gold">
       {{ state.gold }} gold
       <span v-if="goldIncome() > 0" class="income">+{{ goldIncome() }} per turn</span>
     </p>
+    <CaravanTreasury />
     <button class="btn" :disabled="!canHireMercenary()" @click="hireMercenary">
       Hire mercenary<template v-if="cost !== undefined"> ({{ cost }} gold)</template>
     </button>

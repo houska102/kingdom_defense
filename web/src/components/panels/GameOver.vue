@@ -8,6 +8,9 @@ import { currentCity, nextCity, restart, state, totalTurns } from '@/game/store'
     <h2>{{ currentCity().name }} has fallen</h2>
     <p>{{ state.fallReason }}</p>
     <p class="score">Turns survived: {{ state.turn - 1 }}</p>
+    <p v-if="state.escapedGold > 0">
+      Refugees bring {{ state.escapedGold }} gold to the next city.
+    </p>
     <template v-if="state.unlocks.length">
       <h3>Unlocked for later cities</h3>
       <ul>

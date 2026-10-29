@@ -42,6 +42,12 @@ function unitDamage(unitId: string) {
       {{ preview.absorbedByGarrison }}, tile takes {{ preview.tileDamage }}
       <strong v-if="destroys"> - tile will be destroyed!</strong>
     </span>
+    <span v-if="preview && tile?.escaping" class="escape" :class="{ blocked: preview.tileDamage > 0 }">
+      <template v-if="preview.tileDamage > 0">
+        Escape fails: block {{ preview.tileDamage }} more damage to get away.
+      </template>
+      <template v-else>Escaping: gets away unless an event changes the attack.</template>
+    </span>
     <div class="assigned">
       <button
         v-for="unit in units"
@@ -82,6 +88,15 @@ function unitDamage(unitId: string) {
   .strength {
     margin-left: 4px;
     color: $color-attack;
+  }
+
+  .escape {
+    font-size: 13px;
+    color: $color-accent;
+
+    &.blocked {
+      color: $color-attack;
+    }
   }
 
   .deep {

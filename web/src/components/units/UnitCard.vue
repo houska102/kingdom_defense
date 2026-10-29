@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { describeUnitPassive } from '@/game/entities'
+import { describeUnitPassive, maxEndurance } from '@/game/entities'
 import { attackOfUnit, state, tileById } from '@/game/store'
 import type { Unit } from '@/game/types'
 import StatBar from '@/components/shared/StatBar.vue'
@@ -31,7 +31,11 @@ const assignedTileName = computed(() => {
       <span v-else-if="inBattle" class="badge resting">Resting</span>
     </span>
     <StatBar :value="unit.health" :max="unit.def.health" kind="health" />
-    <StatBar :value="unit.endurance" :max="unit.def.endurance" kind="endurance" />
+    <StatBar
+      :value="unit.endurance"
+      :max="maxEndurance(unit, state.fallenUnits)"
+      kind="endurance"
+    />
     <span v-if="unit.def.passive" class="passive">
       {{ describeUnitPassive(unit.def.passive) }}
     </span>

@@ -1,6 +1,6 @@
 import { garrisonPool, isLastCity } from './campaign'
 import { UNLOCKABLE_TILES, UNLOCKABLE_UNITS } from './data'
-import { createUnit, nextId, passiveTotal } from './entities'
+import { createUnit, maxEndurance, nextId, passiveTotal } from './entities'
 import type { Rng } from './rng'
 import type { Card, GameState, Tile, TileDef, UnitDef } from './types'
 
@@ -50,7 +50,7 @@ const TEMPLATES: CardTemplate[] = [
     make: (state) => ({
       id: nextId(state, 'card'),
       name: 'Fortify',
-      description: 'A tile gets +1 defense next turn.',
+      description: 'A tile permanently gets +1 defense.',
       target: 'tile',
       effect: { kind: 'fortifyTile', amount: 1 },
       nextCity: false,
@@ -163,7 +163,7 @@ export function applyCard(state: GameState, card: Card, targetId?: string): bool
     case 'restUnit': {
       const unit = state.units.find((u) => u.id === targetId && u.health > 0)
       if (!unit) return false
-      unit.endurance = unit.def.endurance
+      unit.endurance = maxEndurance(unit, state.fallenUnits)
       unit.health = Math.min(unit.def.health, unit.health + effect.heal)
       return true
     }

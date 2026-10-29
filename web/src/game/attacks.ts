@@ -7,9 +7,12 @@ export const DIRECTIONS: Direction[] = ['north', 'east', 'south', 'west']
 /** Attacks on tiles behind the front line (rank > 0) hit at this fraction of their strength. */
 export const DEEP_ATTACK_FACTOR = 0.5
 
-/** Attacks per turn, never more than the width of the grid. */
+/** After this turn every turn adds one attack on top of the grid cap. */
+export const ESCALATION_TURN = 10
+
+/** Attacks per turn, capped at the width of the grid until the city outlasts `ESCALATION_TURN`. */
 export function attackCount(turn: number, gridSize = Infinity): number {
-  return Math.min(2 + Math.floor(turn / 2), gridSize)
+  return Math.min(2 + Math.floor(turn / 2), gridSize) + Math.max(0, turn - ESCALATION_TURN)
 }
 
 export function baseAttackStrength(turn: number, bonus = 0): number {

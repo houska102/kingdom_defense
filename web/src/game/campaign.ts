@@ -116,6 +116,7 @@ export function createCity(progress: CampaignProgress, nextId: number, rng: Rng)
     unlocks: [],
     fallReason: null,
     fallenUnits: 0,
+    escapedGold: 0,
   }
   for (const p of config.prebuilt) {
     const tile = createTile(state, ALL_TILE_DEFS[p.defId], p.y * state.gridSize + p.x)

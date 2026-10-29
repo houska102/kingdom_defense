@@ -38,20 +38,30 @@ Decisions made (first prototype - single city):
 
 - city grid grows over the campaign: 4x4 in the first third (cities 1-4), 5x5 in the second (5-7), 6x6 in the last (8-10)
     - prebuilt tiles are placed by x/y on that city's grid
-- default buildings: Keep, Wall x3, House x4, Watchtower x2, Barracks
+- default buildings: Keep, Wall x3, House x4, Watchtower x2, Barracks, Refugee Caravan
+    - Refugee Caravan (0 def, 2 HP): gathers 1 gold for each turn it survives (only turns the city survives count)
+        - Escape action (tile info modal), only during the assign phase
+            - not attacked: leaves at once, its cell becomes empty (can open a flank)
+            - attacked: leaves at the end of the turn only if the attack (events included) deals it no damage, otherwise it takes the hit and stays
+        - escaped gold is added to the treasury when the next city starts
+        - the gold is lost if the caravan is destroyed or the city falls before it escapes
+- tile info modal: clicking a tile opens its building info when the click has no other action
+    - tile specific actions are shown inside it (only the Refugee Caravan has one for now)
+    - on mobile, attacked tiles show the info inside the Defend modal
 - default garrison: choose 3 of 5 (Militia, Spearmen, Knights, Archers, Veterans)
     - plus Sellswords as a free extra pick (see unit passives), they dont count toward the pool size for picks
     - each unit has strength, health, endurance and maybe a passive
 - combat order: passives reduce attack -> tile defense -> garrison strength -> tile health
     - multiple garrisons on one attack split the absorbed damage by strength ratio (rounded to whole numbers)
 - attacks per turn: 2 + turn/2 (rounded down), never more than the grid width (4x4 = 4, 5x5 = 5, 6x6 = 6)
+    - after turn 10 every turn adds +1 attack on top of the grid cap (turn 11 +1, turn 12 +2, ...)
 - attack strength grows every turn (~3 + turn*1.5 with random spread) so destruction can't be stalled forever
 - attacks target living tiles from the enemy side (see attack direction below), extra attacks merge onto already attacked tiles (marked as stronger)
 - garrison that rested this turn gets full endurance back, garrison that fought gets 1 back
 - garrison at 0 health dies, tile at 0 health is destroyed
 - city falls when the Keep is destroyed or no tiles are left
 - "Make a choice" = pick 1 of 3 cards each turn
-    - now cards: repair tile, rest garrison, recruit garrison, fortify tile (+1 defense this turn), tribute (+1-3 gold)
+    - now cards: repair tile, rest garrison, recruit garrison, fortify tile (+1 defense permanently), tribute (+1-3 gold)
     - next city cards: unlock a new tile or garrison type for all later cities
 - score for now = turns survived
 
@@ -70,7 +80,7 @@ Attack direction:
     - holes fully enclosed by standing tiles dont expose anything
 - attacks hit the front line first, if there are more attacks than front line tiles the rest go to rank 1, then rank 2...
     - attacks on deeper ranks (rank 1+) are half strength (rounded up), marked with ½
-        - NOTE: with attacks capped at the grid width this currently never happens, the front line always has enough tiles
+        - NOTE: with attacks capped at the grid width this only happens after turn 10 (or with Second Army)
     - when front tiles get destroyed the next ones become the front line, so the city gets eaten from that side
 - merging only happens when there are more attacks than standing tiles in the whole city
 
@@ -157,18 +167,18 @@ Campaign (10 cities):
     - Wardens (3 str, 5 HP, 2 end) - regain +1 endurance after fighting
     - Militia, Knights and Paladins have no passive
     - Captain (2 str, 4 HP, 3 end) - Inspiring: events on its attack are 15% more likely to be good, stacks
-    - Barbarian Berserkers (3 str, 4 HP, 1 end) - Last Stand: +2 strength while at 1 HP
-    - Sellswords (4 str, 3 HP, 2 end) - Paid Blade:
+    - Barbarian Berserkers (5 str, 4 HP, 1 end) - Last Stand: +3 strength while at 1 HP
+    - Sellswords (6 str, 5 HP, 3 end) - Paid Blade:
         - free pick, doesnt use a garrison pick slot
         - can only be picked with at least 1 gold (so never in the first city)
         - costs 1 gold at the end of each turn (after income), leaves when the treasury cant pay
         - can also come from mercenary hire, recruit cards and Wandering Sellswords, same upkeep
     - Skirmishers (2 str, 3 HP, 3 end) - Flanker: +2 strength when the defended tile is exposed from more than one side
-    - Warlord (4 str, 5 HP, 2 end) - Bloodlust: +1 strength for each unit that died in this city
+    - Warlord (4 str, 5 HP, 2 end) - Bloodlust: +1 strength and +1 max endurance for each unit that died in this city
     - Standard Bearer (1 str, 4 HP, 3 end) - Banner: +1 strength to every other unit on the same attack, stacks
 - Gold:
     - campaign-wide treasury, starts at 0 and carries over between cities
-    - earned from tile passives (Mercenary Camp) and the Tribute card
+    - earned from tile passives (Mercenary Camp, Refugee Caravan) and the Tribute card
     - spent on mercenaries for now, meant as a general currency for future uses (shops, upgrades, ...)
 - end of campaign: turns survived per city, total turns and permanent points
     - permanent points = total turns, not spendable yet

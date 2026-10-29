@@ -1,3 +1,4 @@
+import type { CombatResult } from './combat'
 import type {
   AmountPassiveKind,
   GameState,
@@ -22,6 +23,13 @@ export function createUnit(state: Pick<GameState, 'nextId'>, def: UnitDef): Unit
   return { id: nextId(state, 'unit'), def, health: def.health, endurance: def.endurance }
 }
 
+/** Endurance cap of `unit`, raised by `bloodlust` for each unit that fell in this city. */
+export function maxEndurance(unit: Unit, fallenUnits: number): number {
+  const passive = unit.def.passive
+  const bonus = passive?.kind === 'bloodlust' ? passive.amount * fallenUnits : 0
+  return unit.def.endurance + bonus
+}
+
 /** Passives of `kind` on a tile, typed to that kind. */
 export function tilePassives<K extends TilePassiveKind>(
   tile: Tile,
@@ -33,6 +41,13 @@ export function tilePassives<K extends TilePassiveKind>(
 }
 
 export const hasPassive = (tile: Tile, kind: TilePassiveKind) => tilePassives(tile, kind).length > 0
+
+/** Tiles that can be sent away during the assign phase. */
+export const isEscape = (tile: Tile) => hasPassive(tile, 'escape')
+
+/** An attacked tile ordered to escape gets away only if the attack deals it no damage. */
+export const escapes = (tile: Tile, result: Pick<CombatResult, 'tileDamage'>) =>
+  !!tile.escaping && result.tileDamage === 0
 
 /** Sum of `amount` across passives of `kind` on standing tiles. */
 export function passiveTotal(tiles: Tile[], kind: AmountPassiveKind): number {
@@ -60,7 +75,7 @@ export function describeUnitPassive(passive: UnitPassive): string {
     case 'flanker':
       return `+${passive.amount} strength on tiles exposed from 2+ sides`
     case 'bloodlust':
-      return `+${passive.amount} strength per unit fallen this city`
+      return `+${passive.amount} strength and max endurance per unit fallen this city`
     case 'banner':
       return `+${passive.amount} strength to others on its attack`
   }
