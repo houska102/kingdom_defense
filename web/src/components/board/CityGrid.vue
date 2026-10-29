@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { FRAME_CELLS } from '@/canvas/cityScene'
 import { attackOnTile, state, tileAt } from '@/game/store'
 import AttackBanner from './AttackBanner.vue'
 import CityCanvas from './CityCanvas.vue'
@@ -13,6 +14,12 @@ const props = defineProps<{
 const emit = defineEmits<{ cellClick: [cell: number] }>()
 
 const cells = computed(() => Array.from({ length: state.gridSize * state.gridSize }, (_, cell) => cell))
+
+/** Keeps the cells inside the terrain frame drawn on the canvas. Percent padding follows the width. */
+const gridStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${state.gridSize}, minmax(0, 1fr))`,
+  padding: `${(FRAME_CELLS / (state.gridSize + 2 * FRAME_CELLS)) * 100}%`,
+}))
 
 function isActive(cell: number): boolean {
   const tile = tileAt(cell)
@@ -39,7 +46,7 @@ function isActive(cell: number): boolean {
     <AttackBanner class="banner" />
     <div class="city-board">
       <CityCanvas />
-      <div class="city-grid" :style="{ gridTemplateColumns: `repeat(${state.gridSize}, minmax(0, 1fr))` }">
+      <div class="city-grid" :style="gridStyle">
         <GridCell
           v-for="cell in cells"
           :key="cell"
@@ -102,6 +109,7 @@ $side-banner-width: 48px;
 .city-grid {
   position: relative;
   display: grid;
+  box-sizing: border-box;
   height: 100%;
 }
 </style>

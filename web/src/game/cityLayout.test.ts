@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { roadLinks, wallLinks } from './cityLayout'
+import { flankSides, roadLinks, wallLinks } from './cityLayout'
 import { ALL_TILE_DEFS } from './data'
 import { createTile } from './entities'
 
@@ -59,18 +59,37 @@ describe('wallLinks', () => {
     expect(links.get(4)).toEqual(['north'])
   })
 
-  it('joins walls to fortified buildings, but not fortified buildings to each other', () => {
+  it('joins walls and fortified buildings to each other', () => {
     const tiles = city([
       ['watchtower', 'wall', 'barracks'],
       ['keep', 'ballista', '.'],
       ['.', '.', '.'],
     ])
     const links = wallLinks(tiles, 3)
-    expect(links.get(0)).toEqual(['east'])
+    expect(links.get(0)).toEqual(['east', 'south'])
     expect(links.get(1)).toEqual(['east', 'south', 'west'])
     expect(links.get(2)).toEqual(['west'])
-    expect(links.get(3)).toEqual([])
-    expect(links.get(4)).toEqual(['north'])
+    expect(links.get(3)).toEqual(['north', 'east'])
+    expect(links.get(4)).toEqual(['north', 'west'])
+  })
+
+  it('joins edge tiles to the cliffs on the flanks', () => {
+    const tiles = city([
+      ['wall', 'house', 'watchtower'],
+      ['.', '.', '.'],
+      ['.', '.', 'wall'],
+    ])
+    const links = wallLinks(tiles, 3, flankSides('north'))
+    expect(links.get(0)).toEqual(['west'])
+    expect(links.get(2)).toEqual(['east'])
+    expect(links.get(8)).toEqual(['east'])
+  })
+
+  it('puts the flanks across the attack direction', () => {
+    expect(flankSides('north')).toEqual(['east', 'west'])
+    expect(flankSides('south')).toEqual(['east', 'west'])
+    expect(flankSides('east')).toEqual(['north', 'south'])
+    expect(flankSides('west')).toEqual(['north', 'south'])
   })
 
   it('breaks at ruined walls', () => {

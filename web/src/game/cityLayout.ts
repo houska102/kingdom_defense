@@ -14,11 +14,19 @@ const joinsWalls = (tile: Tile) => isWall(tile) || WALL_JOINING_IDS.has(tile.def
 const standingByCell = (tiles: Tile[]) =>
   new Map(tiles.filter((t) => t.health > 0).map((t) => [t.cell, t]))
 
+/** Board edges walled off by cliffs: the two sides across the attack direction. */
+export const flankSides = (attack: Direction): Direction[] =>
+  attack === 'north' || attack === 'south' ? ['east', 'west'] : ['north', 'south']
+
 /**
  * For each standing wall or fortified building, the sides joined to a neighbour.
- * At least one side of every join is a wall, two fortified buildings don't join each other.
+ * Tiles on a board edge listed in `cliffSides` also join the cliff on that side.
  */
-export function wallLinks(tiles: Tile[], gridSize: number): Map<number, Direction[]> {
+export function wallLinks(
+  tiles: Tile[],
+  gridSize: number,
+  cliffSides: Direction[] = [],
+): Map<number, Direction[]> {
   const standing = standingByCell(tiles)
   const links = new Map<number, Direction[]>()
   for (const tile of standing.values()) {
@@ -27,8 +35,9 @@ export function wallLinks(tiles: Tile[], gridSize: number): Map<number, Directio
       tile.cell,
       DIRECTIONS.filter((side) => {
         const next = neighborCell(tile.cell, side, gridSize)
-        const neighbour = next === undefined ? undefined : standing.get(next)
-        return !!neighbour && joinsWalls(neighbour) && (isWall(tile) || isWall(neighbour))
+        if (next === undefined) return cliffSides.includes(side)
+        const neighbour = standing.get(next)
+        return !!neighbour && joinsWalls(neighbour)
       }),
     )
   }

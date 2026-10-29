@@ -1,12 +1,14 @@
 import { signal } from 'canvasengine'
-import { isWall, roadLinks, wallLinks } from '@/game/cityLayout'
+import { flankSides, isWall, roadLinks, wallLinks } from '@/game/cityLayout'
 import type { Direction, Tile } from '@/game/types'
+
+export { FRAME_CELLS } from './terrain'
 
 export interface SceneTile {
   cell: number
   defId: string
   ruined: boolean
-  /** Sides joined to a neighbouring wall, only set on wall tiles and the Keep. */
+  /** Sides joined to a neighbouring wall or a cliff, only set on wall and fortified tiles. */
   links: Direction[]
   /** Directions of the roads passing through a wall tile. */
   gates: GateAxis[]
@@ -24,9 +26,11 @@ export const sceneSize = signal(0)
 export const sceneGrid = signal(4)
 export const sceneTiles = signal<SceneTile[]>([])
 export const sceneRoads = signal<[number, number][]>([])
+/** Side the enemy attacks from, the terrain opens towards it. */
+export const sceneDirection = signal<Direction>('north')
 
-export function buildScene(tiles: Tile[], gridSize: number): Scene {
-  const walls = wallLinks(tiles, gridSize)
+export function buildScene(tiles: Tile[], gridSize: number, direction: Direction): Scene {
+  const walls = wallLinks(tiles, gridSize, flankSides(direction))
   const roads = roadLinks(tiles, gridSize)
   const wallCells = new Set(tiles.filter(isWall).map((t) => t.cell))
   const gates = new Map<number, GateAxis[]>()
@@ -50,9 +54,10 @@ export function buildScene(tiles: Tile[], gridSize: number): Scene {
   }
 }
 
-export function syncScene(tiles: Tile[], gridSize: number) {
-  const scene = buildScene(tiles, gridSize)
+export function syncScene(tiles: Tile[], gridSize: number, direction: Direction) {
+  const scene = buildScene(tiles, gridSize, direction)
   sceneGrid.set(gridSize)
+  sceneDirection.set(direction)
   sceneTiles.set(scene.tiles)
   sceneRoads.set(scene.roads)
 }

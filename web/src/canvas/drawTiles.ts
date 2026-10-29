@@ -2,6 +2,8 @@ import type { Graphics } from 'pixi.js'
 import { WALL_JOINING_IDS } from '@/game/cityLayout'
 import type { Direction } from '@/game/types'
 import {
+  FRAME_CELLS,
+  sceneDirection,
   sceneGrid,
   sceneRoads,
   sceneSize,
@@ -9,6 +11,7 @@ import {
   type GateAxis,
   type SceneTile,
 } from './cityScene'
+import { terrainLayout, type Crop, type Rect, type Rock } from './terrain'
 
 const GRASS = 0x3d5a32
 const GRASS_ALT = 0x42613a
@@ -31,11 +34,14 @@ interface Cell {
 /** Buildings sit above the cell centre, the stats overlay covers the bottom of the cell. */
 const BUILDING_LIFT = 0.14
 
+/** Size of one cell in pixels, the terrain frame takes `FRAME_CELLS` on every side. */
+const cellSize = () => sceneSize() / (sceneGrid() + 2 * FRAME_CELLS)
+
 function cellAt(cell: number, lift = 0): Cell {
   const grid = sceneGrid()
-  const s = sceneSize() / grid
-  const x0 = (cell % grid) * s
-  const y0 = (Math.floor(cell / grid) - lift) * s
+  const s = cellSize()
+  const x0 = ((cell % grid) + FRAME_CELLS) * s
+  const y0 = (Math.floor(cell / grid) + FRAME_CELLS - lift) * s
   return { x: (u) => x0 + u * s, y: (v) => y0 + v * s, s }
 }
 
@@ -62,23 +68,88 @@ function shade(color: number, factor: number): number {
 
 export function drawGround(g: Graphics) {
   const grid = sceneGrid()
-  const size = sceneSize()
-  if (!size) return
+  const s = cellSize()
+  if (!s) return
   for (let cell = 0; cell < grid * grid; cell++) {
     const c = cellAt(cell)
     const alt = ((cell % grid) + Math.floor(cell / grid)) % 2 === 1
     rect(g, c, 0, 0, 1, 1).fill(alt ? GRASS_ALT : GRASS)
   }
+  const from = FRAME_CELLS * s
+  const to = (FRAME_CELLS + grid) * s
   for (let i = 1; i < grid; i++) {
-    const at = (i * size) / grid
-    g.moveTo(at, 0).lineTo(at, size).moveTo(0, at).lineTo(size, at)
+    const at = from + i * s
+    g.moveTo(at, from).lineTo(at, to).moveTo(from, at).lineTo(to, at)
   }
   g.stroke({ width: 1, color: GRID_LINE, alpha: 0.6 })
 }
 
+const APPROACH = 0x56603a
+const ROCK = 0x5f5a54
+const ROCK_FACE = 0x3e3a36
+const BOULDER = 0x7d776f
+const HEDGE = 0x2f4a24
+const CROP_COLORS: Record<Crop, number> = { wheat: 0xc9a94a, green: 0x6f8f3a, fallow: 0x8a6a42 }
+
+/** Terrain around the city: open approach on the attack side, cliffs on the flanks, fields behind. */
+export function drawTerrain(g: Graphics) {
+  const s = cellSize()
+  if (!s) return
+  const t = terrainLayout(sceneGrid(), sceneDirection())
+  const box = (r: Rect) => g.rect(r.x1 * s, r.y1 * s, (r.x2 - r.x1) * s, (r.y2 - r.y1) * s)
+
+  box(t.approach).fill(APPROACH)
+  const [start, end] = t.track
+  for (const [width, color] of [
+    [0.24, ROAD_EDGE],
+    [0.16, ROAD],
+  ]) {
+    g.moveTo(start.x * s, start.y * s)
+      .lineTo(end.x * s, end.y * s)
+      .stroke({ width: width * s, color })
+  }
+  for (const pebble of t.pebbles) g.circle(pebble.x * s, pebble.y * s, pebble.r * s).fill(0x7a7468)
+
+  for (const patch of t.fields) {
+    box(patch.rect).fill(CROP_COLORS[patch.crop])
+    const { x1, y1, x2, y2 } = patch.rect
+    const step = 0.08
+    if (patch.rows === 'vertical') {
+      for (let x = x1 + step / 2; x < x2; x += step) g.moveTo(x * s, y1 * s).lineTo(x * s, y2 * s)
+    } else {
+      for (let y = y1 + step / 2; y < y2; y += step) g.moveTo(x1 * s, y * s).lineTo(x2 * s, y * s)
+    }
+    g.stroke({ width: Math.max(1, s * 0.012), color: shade(CROP_COLORS[patch.crop], 0.8) })
+    box(patch.rect).stroke({ width: Math.max(1, s * 0.04), color: HEDGE })
+  }
+
+  for (const cliff of t.cliffs) box(cliff).fill(ROCK)
+  for (const face of t.cliffFaces) box(face).fill(ROCK_FACE)
+  for (const boulder of t.boulders) drawBoulder(g, s, boulder)
+  for (const shadow of t.cliffShadows) box(shadow).fill({ color: 0x000000, alpha: 0.3 })
+}
+
+/** Irregular rock seen from above, with a shadow down-right and a lit top-left facet. */
+function drawBoulder(g: Graphics, s: number, rock: Rock) {
+  let n = rock.seed
+  const rand = () => {
+    n = (n * 9301 + 49297) % 233280
+    return n / 233280
+  }
+  const radii = Array.from({ length: 7 }, () => rock.r * (0.75 + rand() * 0.3))
+  const outlineAt = (scale: number, offset: number) =>
+    radii.flatMap((r, i) => {
+      const a = (i / radii.length) * Math.PI * 2
+      return [(rock.x + offset + Math.cos(a) * r * scale) * s, (rock.y + offset + Math.sin(a) * r * scale) * s]
+    })
+  g.poly(outlineAt(1, rock.r * 0.25)).fill({ color: 0x000000, alpha: 0.3 })
+  g.poly(outlineAt(1, 0)).fill(BOULDER).stroke({ width: Math.max(1, s * 0.012), color: ROCK_FACE })
+  g.poly(outlineAt(0.5, -rock.r * 0.2)).fill(shade(BOULDER, 1.2))
+}
+
 export function drawRoads(g: Graphics) {
   const roads = sceneRoads()
-  const s = sceneSize() / sceneGrid()
+  const s = cellSize()
   if (!roads.length || !s) return
   const path = () => {
     for (const [a, b] of roads) {

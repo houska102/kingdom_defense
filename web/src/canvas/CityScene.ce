@@ -1,9 +1,10 @@
 <Canvas backgroundColor="#262633">
   <Graphics draw={drawGround} />
+  <Graphics draw={drawTerrain} />
   <Graphics draw={drawRoads} />
   <Graphics draw={drawTiles} />
 </Canvas>
 
 <script>
-import { drawGround, drawRoads, drawTiles } from './drawTiles'
+import { drawGround, drawRoads, drawTerrain, drawTiles } from './drawTiles'
 </script>

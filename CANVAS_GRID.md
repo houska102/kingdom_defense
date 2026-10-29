@@ -1,7 +1,7 @@
 # Canvas city grid
 
 The city grid is drawn on a [CanvasEngine](https://canvasengine.net/) canvas (PixiJS underneath).
-The canvas only draws the city. Stats, badges, highlights and clicks stay in the HTML cells on top of it.
+The canvas draws the city and the terrain around it. Stats, badges, highlights and clicks stay in the HTML cells on top of it.
 
 ## Layers
 
@@ -12,6 +12,7 @@ CityGrid.vue
 ```
 
 - Cells sit flush (no gap) so each HTML cell lines up exactly with its canvas cell.
+- `.city-grid` is padded by the terrain frame (`FRAME_CELLS`) so the cells sit over the city, not the terrain.
 - `GridCell.vue` has no background of its own, only a dark fade at the bottom so the stats stay readable.
 - Both the desktop and the mobile layout use `CityGrid`, so both get the canvas.
 
@@ -21,7 +22,8 @@ CityGrid.vue
 | --- | --- |
 | `web/src/game/cityLayout.ts` | Pure rules: which walls join, where roads go. Tested in `cityLayout.test.ts`. |
 | `web/src/canvas/cityScene.ts` | Turns game tiles into scene data and holds it in CanvasEngine signals. |
-| `web/src/canvas/CityScene.ce` | The CanvasEngine scene: three `Graphics` layers. |
+| `web/src/canvas/terrain.ts` | Pure terrain layout around the city, rotated to the attack side. Tested in `terrain.test.ts`. |
+| `web/src/canvas/CityScene.ce` | The CanvasEngine scene: four `Graphics` layers. |
 | `web/src/canvas/drawTiles.ts` | All drawing code, plain Pixi `Graphics` calls. |
 | `web/src/components/board/CityCanvas.vue` | Starts, resizes and destroys the canvas, feeds it the game state. |
 | `web/src/canvas/ce.d.ts` | Lets TypeScript import `.ce` files. |
@@ -34,7 +36,7 @@ CityGrid.vue
 store.ts state (Vue reactive)
   -> watchEffect in CityCanvas.vue
   -> syncScene() / buildScene() in cityScene.ts
-  -> signals: sceneTiles, sceneRoads, sceneGrid, sceneSize
+  -> signals: sceneTiles, sceneRoads, sceneGrid, sceneSize, sceneDirection
   -> draw functions in drawTiles.ts (re-run when a signal they read changes)
 ```
 
@@ -48,16 +50,34 @@ store.ts state (Vue reactive)
 
 Drawn bottom to top, each one redraws the whole board:
 
-1. **Ground**: grass checkerboard with faint grid lines.
-2. **Roads**: dirt paths from cell centre to cell centre for every road link.
-3. **Tiles**: every building, wall and ruin.
+1. **Ground**: grass checkerboard with faint grid lines, city area only.
+2. **Terrain**: everything around the city (see below). Above the ground so the cliff shadows fall onto the city grass.
+3. **Roads**: dirt paths from cell centre to cell centre for every road link.
+4. **Tiles**: every building, wall and ruin.
+
+## Terrain
+
+The city sits in a chokepoint, the enemy can only come in from the attack side.
+
+- The board keeps its size. A frame of `FRAME_CELLS` (0.6 of a cell) wraps the grid on every side,
+  so a cell is `size / (grid + 2 * FRAME_CELLS)` pixels. `cellAt()` adds the frame offset.
+- `terrainLayout(gridSize, direction)` returns everything in board units (1 unit = 1 cell):
+  - **Approach**: open trampled ground on the attack side, exactly as wide as the city, with a dirt
+    track and pebbles.
+  - **Cliffs**: both flanks, the full depth of the board (corners included). Boulders on top, a dark
+    rock face and a shadow along the side facing the city.
+  - **Fields**: crop patches (wheat, green, fallow) with furrows and hedges, behind the city between the cliffs.
+- The layout is built as if the attack comes from the north, then rotated onto `sceneDirection`.
+  Only points are rotated, so shading still comes from the top left.
+- Positions are seeded by the grid size, so the terrain doesn't change between redraws.
 
 ## Walls
 
 - Wall tiles: Wall, Bastion, Stockade, Last Bastion (`WALL_DEF_IDS`).
 - Fortified buildings: Keep, Watchtower, Barracks, Ballista Tower (`WALL_JOINING_IDS`).
-- A tile joins a neighbour (up, down, left, right) when both are standing, both are walls or fortified,
-  and at least one of them is a wall. Two fortified buildings never join each other.
+- A tile joins a neighbour (up, down, left, right) when both are standing and both are walls or fortified.
+- A wall or fortified tile on a flank edge (the board sides across the attack direction, `flankSides`)
+  also joins the cliff there, so walls can seal the chokepoint from rock to rock.
 - A join is drawn as a wall section from the cell centre to the shared edge, so neighbours meet seamlessly.
 - Wall and fortified tiles are drawn centred in their cell so their sections line up.
 - Ruined tiles (0 health) don't join anything and are drawn as rubble.

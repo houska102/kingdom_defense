@@ -11,7 +11,7 @@ const host = useTemplateRef<HTMLDivElement>('host')
 let canvas: Bootstrapped | undefined
 let unmounted = false
 
-watchEffect(() => syncScene(state.tiles, state.gridSize))
+watchEffect(() => syncScene(state.tiles, state.gridSize, state.attackDirection))
 
 const observer = new ResizeObserver(([entry]) => {
   sceneSize.set(entry.contentRect.width)
