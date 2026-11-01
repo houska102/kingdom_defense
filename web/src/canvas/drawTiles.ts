@@ -66,10 +66,20 @@ function shade(color: number, factor: number): number {
   return (channel(16) << 16) | (channel(8) << 8) | channel(0)
 }
 
+/**
+ * Takes the layer out of Pixi's flex layout.
+ * The production bundle loads the layout plugin even with `enableLayout: false`,
+ * which would line the layers up side by side instead of on top of each other.
+ */
+function detachLayout(g: Graphics) {
+  if (g.layout) g.layout = false
+}
+
 export function drawGround(g: Graphics) {
   const grid = sceneGrid()
   const s = cellSize()
   if (!s) return
+  detachLayout(g)
   for (let cell = 0; cell < grid * grid; cell++) {
     const c = cellAt(cell)
     const alt = ((cell % grid) + Math.floor(cell / grid)) % 2 === 1
@@ -96,6 +106,7 @@ export function drawTerrain(g: Graphics) {
   const s = cellSize()
   if (!s) return
   const t = terrainLayout(sceneGrid(), sceneDirection())
+  detachLayout(g)
   const box = (r: Rect) => g.rect(r.x1 * s, r.y1 * s, (r.x2 - r.x1) * s, (r.y2 - r.y1) * s)
 
   box(t.approach).fill(APPROACH)
@@ -151,6 +162,7 @@ export function drawRoads(g: Graphics) {
   const roads = sceneRoads()
   const s = cellSize()
   if (!roads.length || !s) return
+  detachLayout(g)
   const path = () => {
     for (const [a, b] of roads) {
       const from = centre(a)
@@ -166,6 +178,7 @@ export function drawRoads(g: Graphics) {
 
 export function drawTiles(g: Graphics) {
   if (!sceneSize()) return
+  detachLayout(g)
   for (const tile of sceneTiles()) {
     const isWall = tile.defId in WALL_STYLES
     const fortified = WALL_JOINING_IDS.has(tile.defId)
