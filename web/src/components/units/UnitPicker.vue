@@ -24,7 +24,7 @@ import {
       >
         <span class="title">
           {{ def.name }}
-          <span v-if="isFreePick(def)" class="tag">free, {{ upkeepOf(def) }} gold/turn</span>
+          <span v-if="isFreePick(def)" class="tag">free, {{ upkeepOf(def) }} gold/day</span>
         </span>
         <span class="stats">STR {{ def.strength }} / HP {{ def.health }} / END {{ def.endurance }}</span>
         <span class="desc">{{ def.description }}</span>

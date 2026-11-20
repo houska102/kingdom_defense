@@ -1,7 +1,7 @@
 export type TilePassive =
   | { kind: 'adjacentAttackReduction'; amount: number }
   | { kind: 'garrisonRegen'; amount: number }
-  /** While standing, every living unit regains `amount` health at the end of each turn. */
+  /** While standing, every living unit regains `amount` health at the end of each day. */
   | { kind: 'garrisonHeal'; amount: number }
   /** At the start of the defense, adds one `unitDefId` per standing tile of `perTileDefId`. */
   | { kind: 'recruitPerTile'; perTileDefId: string; unitDefId: string }
@@ -9,15 +9,15 @@ export type TilePassive =
   | { kind: 'goodEventBonus'; amount: number }
   /** Can't be attacked while another standing tile shares its lane. */
   | { kind: 'laneAnchor' }
-  /** Grants `amount` gold at the end of each turn. */
+  /** Grants `amount` gold at the end of each day. */
   | { kind: 'goldIncome'; amount: number }
   /** While standing, a random unit (locked ones included) can be hired for `cost` gold. */
   | { kind: 'mercenaryHire'; cost: number }
   /** While standing, the card draft offers `amount` extra cards. */
   | { kind: 'draftBonus'; amount: number }
-  /** Stores `amount` gold for every turn the tile survives. */
+  /** Stores `amount` gold for every day the tile survives. */
   | { kind: 'goldHoard'; amount: number }
-  /** Can be sent away during the assign phase, taking its hoard to the next city. */
+  /** Can be sent away during the battle, taking its hoard to the next city. */
   | { kind: 'escape' }
 
 export type TilePassiveKind = TilePassive['kind']
@@ -35,7 +35,7 @@ export type UnitPassive =
   | { kind: 'lastStand'; amount: number }
   /**
    * Doesn't use a garrison pick, can only be picked with at least `upkeep` gold.
-   * Costs `upkeep` gold at the end of each turn and leaves when it can't be paid.
+   * Costs `upkeep` gold at the end of each day and leaves when it can't be paid.
    */
   | { kind: 'paidBlade'; upkeep: number }
   /** +`amount` strength when the defended tile is exposed from more than one side. */
@@ -78,7 +78,7 @@ export interface Tile {
   prebuilt?: boolean
   /** Gold stored by `goldHoard` passives. */
   hoard?: number
-  /** Ordered to escape while attacked, leaves at the end of the turn if it takes no damage. */
+  /** Ordered to escape while attacked, leaves when the fight ends if it took no damage. */
   escaping?: boolean
 }
 
@@ -100,7 +100,7 @@ export interface CityConfig {
 
 export interface CityResult {
   name: string
-  turns: number
+  days: number
   fallReason: string
 }
 
@@ -111,6 +111,9 @@ export interface Unit {
   endurance: number
 }
 
+/** `incoming` attacks wait for orders while the game is paused, `fighting` ones deal damage each tick. */
+export type AttackStatus = 'incoming' | 'fighting'
+
 export interface Attack {
   id: string
   tileId: string
@@ -119,6 +122,17 @@ export interface Attack {
   merged: number
   /** Targets a tile behind the front line, so it hits at reduced strength. */
   deep?: boolean
+  status: AttackStatus
+  /** Ticks the fight lasts. */
+  duration: number
+  /** Fight ticks already dealt. */
+  elapsed: number
+  /** Rolled when the fight starts, applies to every tick of it. */
+  event?: GameEvent
+  /** Tile damage dealt so far, an escaping tile only gets away if this stays 0. */
+  tileDamageDealt: number
+  /** Units sent in after the fight started, they fight at reduced strength. */
+  rushed?: string[]
 }
 
 export type CardTarget = 'tile' | 'unit' | null
@@ -169,7 +183,7 @@ export type BattleEffect =
   | { kind: 'attackBonus'; amount: number }
   /** Added to every tile's defense (floored at 0). */
   | { kind: 'tileDefense'; amount: number }
-  /** Extra attacks every turn. */
+  /** Extra attacks every day. */
   | { kind: 'extraAttacks'; amount: number }
   | { kind: 'garrisonPicks'; amount: number }
   /** Gold granted when the defense starts. */
@@ -194,10 +208,10 @@ export interface BattleEvent {
   effect: BattleEffect
 }
 
-export type Phase = 'setup' | 'assign' | 'event' | 'draft' | 'cityFallen' | 'campaignOver'
+export type Phase = 'setup' | 'battle' | 'draft' | 'cityFallen' | 'campaignOver'
 
 export interface TurnReport {
-  turn: number
+  day: number
   lines: string[]
 }
 
@@ -215,7 +229,14 @@ export interface CampaignProgress {
 
 export interface GameState extends CampaignProgress {
   phase: Phase
-  turn: number
+  /** 1-based day of the defense, 0 during setup. */
+  day: number
+  /** Ticks already played in the current day. */
+  tick: number
+  /** Paused by the player or by a new attack. Modals and the draft stop ticks on their own. */
+  paused: boolean
+  /** Tick speed multiplier. */
+  speed: number
   gridSize: number
   attackDirection: Direction
   nextId: number
@@ -228,11 +249,11 @@ export interface GameState extends CampaignProgress {
   attacks: Attack[]
   /** attackId -> unitIds */
   assignments: Record<string, string[]>
-  selectedUnitId: string | null
   /** Rolled when the city is created, affect the whole defense of the city. */
   battleEvents: BattleEvent[]
   /** Battle events already shown in the setup modal. */
   battleEventIndex: number
+  /** Events of fights that just started, shown one by one. Ticks stop until they are seen. */
   pendingEvents: TriggeredEvent[]
   eventIndex: number
   reports: TurnReport[]

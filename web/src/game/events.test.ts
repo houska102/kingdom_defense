@@ -13,7 +13,16 @@ import { createRng } from './rng'
 import type { Attack, GameEvent } from './types'
 
 const attacks = (count: number): Attack[] =>
-  Array.from({ length: count }, (_, i) => ({ id: `a-${i}`, tileId: `t-${i}`, strength: 9, merged: 0 }))
+  Array.from({ length: count }, (_, i) => ({
+    id: `a-${i}`,
+    tileId: `t-${i}`,
+    strength: 9,
+    merged: 0,
+    status: 'fighting',
+    duration: 4,
+    elapsed: 0,
+    tileDamageDealt: 0,
+  }))
 
 const eventById = (id: string): GameEvent => EVENT_DEFS.find((e) => e.id === id)!
 

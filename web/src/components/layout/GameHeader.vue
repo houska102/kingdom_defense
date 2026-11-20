@@ -15,7 +15,7 @@ function confirmRestart() {
     <h1>Kingdom Defense</h1>
     <span class="turn">
       City {{ state.cityIndex + 1 }} / {{ CAMPAIGN_LENGTH }}: {{ currentCity().name }}
-      <template v-if="state.phase !== 'setup'"> - Turn {{ state.turn }}</template>
+      <template v-if="state.phase !== 'setup'"> - Day {{ state.day }}</template>
     </span>
     <span class="gold">{{ state.gold }} gold</span>
     <button v-if="canRestart" class="restart" @click="confirmRestart">Restart</button>

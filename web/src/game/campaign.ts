@@ -41,7 +41,7 @@ export function garrisonPicks(poolSize: number): number {
   return Math.max(MIN_GARRISON_PICKS, Math.floor(poolSize * GARRISON_PICK_RATIO))
 }
 
-/** Gold a unit costs at the end of each turn. */
+/** Gold a unit costs at the end of each day. */
 export const upkeepOf = (def: UnitDef) => (def.passive?.kind === 'paidBlade' ? def.passive.upkeep : 0)
 
 /** Units with upkeep don't use a garrison pick and don't count toward the pool size for picks. */
@@ -94,7 +94,10 @@ export function createCity(progress: CampaignProgress, nextId: number, rng: Rng)
   const state: GameState = {
     ...progress,
     phase: 'setup',
-    turn: 0,
+    day: 0,
+    tick: 0,
+    paused: false,
+    speed: 1,
     gridSize: gridSizeFor(progress.cityIndex),
     attackDirection: FIXED_ATTACK_DIRECTION ?? rng.pick(DIRECTIONS),
     nextId,
@@ -105,7 +108,6 @@ export function createCity(progress: CampaignProgress, nextId: number, rng: Rng)
     units: [],
     attacks: [],
     assignments: {},
-    selectedUnitId: null,
     battleEvents: rollBattleEvents(rng),
     battleEventIndex: 0,
     pendingEvents: [],

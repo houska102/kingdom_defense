@@ -16,7 +16,10 @@ import type { Card, GameState } from './types'
 const makeState = (): GameState => {
   const state: GameState = {
     phase: 'draft',
-    turn: 1,
+    day: 1,
+    tick: 0,
+    paused: false,
+    speed: 1,
     gridSize: 4,
     attackDirection: 'north',
     nextId: 0,
@@ -27,7 +30,6 @@ const makeState = (): GameState => {
     units: [],
     attacks: [],
     assignments: {},
-    selectedUnitId: null,
     battleEvents: [],
     battleEventIndex: 0,
     pendingEvents: [],

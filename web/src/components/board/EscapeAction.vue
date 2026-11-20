@@ -5,18 +5,26 @@ import type { Tile } from '@/game/types'
 
 const props = defineProps<{ tile: Tile }>()
 
-const attacked = computed(() => !!attackOnTile(props.tile.id))
+const attack = computed(() => attackOnTile(props.tile.id))
+const attacked = computed(() => !!attack.value)
 const damage = computed(() => escapeDamage(props.tile))
+const alreadyHit = computed(() => (attack.value?.tileDamageDealt ?? 0) > 0)
 const blocked = computed(() => canEscape(props.tile) && attacked.value && damage.value > 0)
 const warning = computed(() => canEscape(props.tile) && attacked.value && !!props.tile.escaping)
+const eventCaveat = computed(() =>
+  attack.value?.status === 'incoming' ? ', unless an event changes the attack' : '',
+)
 
 const hint = computed(() => {
-  if (!canEscape(props.tile)) return 'Can only be sent away before ending the turn.'
+  if (!canEscape(props.tile)) return 'Can only be sent away during the battle.'
   if (!attacked.value) return 'Leaves the city now.'
+  if (alreadyHit.value) {
+    return 'Under attack: it already took damage in this fight, the escape would fail.'
+  }
   if (damage.value > 0) {
     return `Under attack: ${damage.value} damage gets through, the escape would fail. Send defenders to block all of it.`
   }
-  return 'Under attack: all damage is blocked, it gets away unless an event changes the attack.'
+  return `Under attack: all damage is blocked, it gets away when the fight ends${eventCaveat.value}.`
 })
 </script>
 
@@ -33,12 +41,15 @@ const hint = computed(() => {
 
     <div v-if="warning" class="warning" role="alert">
       <strong>Under attack!</strong>
-      <span>The {{ tile.def.name }} only gets away if it takes no damage this turn.</span>
-      <span v-if="damage > 0">
+      <span>
+        The {{ tile.def.name }} only gets away if it takes no damage during this fight.
+      </span>
+      <span v-if="alreadyHit">It already took damage, the escape will fail.</span>
+      <span v-else-if="damage > 0">
         {{ damage }} damage gets through right now, the escape will fail and it takes the hit.
         Send defenders to block all of it.
       </span>
-      <span v-else>All damage is blocked for now, but an event can still break the escape.</span>
+      <span v-else>All damage is blocked, it leaves when the fight ends{{ eventCaveat }}.</span>
     </div>
     <span v-else class="hint" :class="{ blocked }">{{ hint }}</span>
   </div>

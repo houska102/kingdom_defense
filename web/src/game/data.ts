@@ -46,7 +46,7 @@ export const TILE_DEFS: Record<string, TileDef> = {
     defense: 2,
     health: 5,
     passives: [{ kind: 'garrisonRegen', amount: 1 }],
-    description: 'While standing, all garrison regains +1 endurance per turn.',
+    description: 'While standing, all garrison regains +1 extra endurance after each fight.',
   },
   refugeeCaravan: {
     id: 'refugeeCaravan',
@@ -55,7 +55,7 @@ export const TILE_DEFS: Record<string, TileDef> = {
     health: 2,
     passives: [{ kind: 'goldHoard', amount: 1 }, { kind: 'escape' }],
     description:
-      'Gathers 1 gold for every turn it survives. Send it away to bring the gold to the next city, lost if destroyed or the city falls.',
+      'Gathers 1 gold for every day it survives. Send it away to bring the gold to the next city, lost if destroyed or the city falls.',
   },
 }
 
@@ -120,7 +120,7 @@ export const UNIT_DEFS: Record<string, UnitDef> = {
     endurance: 3,
     passive: { kind: 'paidBlade', upkeep: 1 },
     description:
-      "Paid Blade: free pick, but cost 1 gold per turn and leave when you can't pay. Needs 1 gold to hire.",
+      "Paid Blade: free pick, but cost 1 gold per day and leave when you can't pay. Needs 1 gold to hire.",
   },
 }
 
@@ -139,7 +139,7 @@ export const UNLOCKABLE_TILES: TileDef[] = [
     health: 4,
     unique: true,
     passives: [{ kind: 'garrisonHeal', amount: 1 }],
-    description: 'While standing, all garrison heals 1 health per turn.',
+    description: 'While standing, all garrison heals 1 health at the end of each day.',
   },
   {
     id: 'stockade',
@@ -193,7 +193,7 @@ export const UNLOCKABLE_TILES: TileDef[] = [
       { kind: 'goldIncome', amount: 1 },
       { kind: 'mercenaryHire', cost: 3 },
     ],
-    description: 'While standing, earns 1 gold per turn and lets you hire a random unit for 3 gold.',
+    description: 'While standing, earns 1 gold per day and lets you hire a random unit for 3 gold.',
   },
   {
     id: 'granary',

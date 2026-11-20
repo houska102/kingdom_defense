@@ -7,16 +7,22 @@ export const DIRECTIONS: Direction[] = ['north', 'east', 'south', 'west']
 /** Attacks on tiles behind the front line (rank > 0) hit at this fraction of their strength. */
 export const DEEP_ATTACK_FACTOR = 0.5
 
-/** After this turn every turn adds one attack on top of the grid cap. */
-export const ESCALATION_TURN = 10
+/** After this day every day adds one attack on top of the grid cap. */
+export const ESCALATION_DAY = 10
 
-/** Attacks per turn, capped at the width of the grid until the city outlasts `ESCALATION_TURN`. */
-export function attackCount(turn: number, gridSize = Infinity): number {
-  return Math.min(2 + Math.floor(turn / 2), gridSize) + Math.max(0, turn - ESCALATION_TURN)
+/** Attacks per day, capped at the width of the grid until the city outlasts `ESCALATION_DAY`. */
+export function attackCount(day: number, gridSize = Infinity): number {
+  return Math.min(2 + Math.floor(day / 2), gridSize) + Math.max(0, day - ESCALATION_DAY)
 }
 
-export function baseAttackStrength(turn: number, bonus = 0): number {
-  return 3 + turn * 1.5 + bonus
+export function baseAttackStrength(day: number, bonus = 0): number {
+  return 3 + day * 1.5 + bonus
+}
+
+/** Random strength of one attack on `day`, reduced for targets behind the front line. */
+export function rollAttackStrength(day: number, rng: Rng, bonus = 0, deep = false): number {
+  const strength = Math.max(1, Math.round(baseAttackStrength(day, bonus) + rng.int(-1, 1)))
+  return deep ? Math.ceil(strength * DEEP_ATTACK_FACTOR) : strength
 }
 
 /** Lane (column or row facing the enemy) and depth (distance from the enemy edge) of a cell. */
@@ -129,58 +135,79 @@ export function isLaneAnchored(
   )
 }
 
+export interface AttackTarget {
+  tile: Tile
+  /** Behind the front line, hit at reduced strength. */
+  deep: boolean
+}
+
 /**
- * Creates this turn's attacks, at most one per living tile, filling exposed tiles (front line
- * and open flanks) first and spilling deeper. When there are more attacks than living tiles,
- * the extra attacks merge into existing ones. `extraAttacks` is added on top of the grid cap.
+ * Tile the next attack hits: a random exposed tile (front line or open flank) not already under
+ * attack, spilling to deeper ranks only when every shallower one is taken. Undefined when every
+ * attackable tile is already under attack or nothing stands.
  */
-export function generateAttacks(
-  turn: number,
+export function pickTarget(
   tiles: Tile[],
+  attackedTileIds: Set<string>,
   rng: Rng,
-  makeId: () => string,
   direction: Direction,
   gridSize: number,
-  bonus = 0,
-  extraAttacks = 0,
-): Attack[] {
+): AttackTarget | undefined {
   const standing = tiles.filter((t) => t.health > 0)
-  if (standing.length === 0) return []
   const unshielded = standing.filter((t) => !isLaneAnchored(t, standing, direction, gridSize))
   const alive = unshielded.length > 0 ? unshielded : standing
-
-  const rollStrength = () =>
-    Math.max(1, Math.round(baseAttackStrength(turn, bonus) + rng.int(-1, 1)))
-  const count = attackCount(turn, gridSize) + extraAttacks
+  const free = alive.filter((t) => !attackedTileIds.has(t.id))
+  if (free.length === 0) return undefined
 
   const reachable = reachableOpenCells(tiles, direction, gridSize)
-  const byRank = new Map<number, Tile[]>()
-  for (const tile of alive) {
-    const rank = frontlineRank(tile, tiles, direction, gridSize, reachable)
-    byRank.set(rank, [...(byRank.get(rank) ?? []), tile])
-  }
-  const ordered = [...byRank.keys()]
-    .sort((a, b) => a - b)
-    .flatMap((rank) => rng.shuffle(byRank.get(rank) ?? []).map((tile) => ({ tile, rank })))
-  const targets = ordered.slice(0, Math.min(count, alive.length))
-
-  const strengthFor = (deep: boolean) => {
-    const strength = rollStrength()
-    return deep ? Math.ceil(strength * DEEP_ATTACK_FACTOR) : strength
-  }
-
-  const attacks: Attack[] = targets.map(({ tile, rank }) => ({
-    id: makeId(),
-    tileId: tile.id,
-    strength: strengthFor(rank > 0),
-    merged: 0,
-    deep: rank > 0,
+  const ranked = free.map((tile) => ({
+    tile,
+    rank: frontlineRank(tile, tiles, direction, gridSize, reachable),
   }))
+  const front = Math.min(...ranked.map((r) => r.rank))
+  const { tile } = rng.pick(ranked.filter((r) => r.rank === front))
+  return { tile, deep: front > 0 }
+}
 
-  for (let i = attacks.length; i < count; i++) {
-    const target = rng.pick(attacks)
-    target.strength += strengthFor(!!target.deep)
-    target.merged++
+export interface SpawnContext {
+  day: number
+  tiles: Tile[]
+  /** Attacks already running, at most one per tile. */
+  attacks: Attack[]
+  rng: Rng
+  makeId: () => string
+  direction: Direction
+  gridSize: number
+  /** Ticks a new fight lasts. */
+  duration: number
+  bonus?: number
+}
+
+/**
+ * Spawns one attack as a new incoming attack on a free target. When every target is already
+ * under attack, its strength merges into a random running attack instead (`isNew` false).
+ */
+export function spawnAttack(ctx: SpawnContext): { attack: Attack; isNew: boolean } | undefined {
+  const { day, rng, bonus = 0 } = ctx
+  const attacked = new Set(ctx.attacks.map((a) => a.tileId))
+  const target = pickTarget(ctx.tiles, attacked, rng, ctx.direction, ctx.gridSize)
+  if (target) {
+    const attack: Attack = {
+      id: ctx.makeId(),
+      tileId: target.tile.id,
+      strength: rollAttackStrength(day, rng, bonus, target.deep),
+      merged: 0,
+      deep: target.deep,
+      status: 'incoming',
+      duration: ctx.duration,
+      elapsed: 0,
+      tileDamageDealt: 0,
+    }
+    return { attack, isNew: true }
   }
-  return attacks
+  if (ctx.attacks.length === 0) return undefined
+  const attack = rng.pick(ctx.attacks)
+  attack.strength += rollAttackStrength(day, rng, bonus, !!attack.deep)
+  attack.merged++
+  return { attack, isNew: false }
 }

@@ -15,7 +15,7 @@ const cost = computed(() => mercenaryCost())
 const hireHint = computed(() => {
   if (cost.value === undefined) return 'Build a Mercenary Camp to hire mercenaries.'
   if (state.gold < cost.value) return `Need ${cost.value - state.gold} more gold.`
-  if (state.phase !== 'assign') return 'Mercenaries can only be hired before ending the turn.'
+  if (state.phase !== 'battle') return 'Mercenaries can only be hired during the battle.'
   return 'Hires a random unit, even ones you have not unlocked.'
 })
 </script>
@@ -28,7 +28,7 @@ const hireHint = computed(() => {
     <h2>Treasury</h2>
     <p class="gold">
       {{ state.gold }} gold
-      <span v-if="goldIncome() > 0" class="income">+{{ goldIncome() }} per turn</span>
+      <span v-if="goldIncome() > 0" class="income">+{{ goldIncome() }} per day</span>
     </p>
     <CaravanTreasury />
     <button class="btn" :disabled="!canHireMercenary()" @click="hireMercenary">

@@ -143,7 +143,7 @@ export function describeBattleEffect(effect: BattleEffect): string {
     case 'tileDefense':
       return `Every tile ${signed(effect.amount)} defense`
     case 'extraAttacks':
-      return `${signed(effect.amount)} attack each turn`
+      return `${signed(effect.amount)} attack each day`
     case 'garrisonPicks':
       return `${signed(effect.amount)} garrison pick`
     case 'gold':

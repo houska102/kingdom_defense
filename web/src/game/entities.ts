@@ -71,7 +71,7 @@ export function describeUnitPassive(passive: UnitPassive): string {
     case 'lastStand':
       return `+${passive.amount} strength at 1 HP`
     case 'paidBlade':
-      return `Costs ${passive.upkeep} gold per turn, leaves when unpaid`
+      return `Costs ${passive.upkeep} gold per day, leaves when unpaid`
     case 'flanker':
       return `+${passive.amount} strength on tiles exposed from 2+ sides`
     case 'bloodlust':

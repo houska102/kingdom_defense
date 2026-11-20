@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import CityGrid from '@/components/board/CityGrid.vue'
 import SetupHint from '@/components/board/SetupHint.vue'
 import GameHeader from '@/components/layout/GameHeader.vue'
+import TimeControls from '@/components/layout/TimeControls.vue'
+import DraftModal from '@/components/modals/DraftModal.vue'
 import EventModal from '@/components/modals/EventModal.vue'
 import TileInfoModal from '@/components/modals/TileInfoModal.vue'
+import DefendModal from '@/components/mobile/DefendModal.vue'
 import MobileGame from '@/components/mobile/MobileGame.vue'
 import AttackPanel from '@/components/panels/AttackPanel.vue'
 import BattleEventsPanel from '@/components/panels/BattleEventsPanel.vue'
-import CardDraft from '@/components/panels/CardDraft.vue'
 import GameOver from '@/components/panels/GameOver.vue'
 import TilePalette from '@/components/panels/TilePalette.vue'
 import TreasuryPanel from '@/components/panels/TreasuryPanel.vue'
@@ -16,25 +18,29 @@ import TurnLog from '@/components/panels/TurnLog.vue'
 import UnlocksPanel from '@/components/panels/UnlocksPanel.vue'
 import UnitPicker from '@/components/units/UnitPicker.vue'
 import UnitRoster from '@/components/units/UnitRoster.vue'
+import { useDefendModal } from '@/composables/useDefendModal'
+import { useGameClock } from '@/composables/useGameClock'
 import { useMobile } from '@/composables/useMobile'
 import {
-  assignSelectedUnit,
   attackOnTile,
   canStartCity,
+  cancelPendingCard,
   chooseCardTarget,
   placeTile,
-  endTurn,
   removeTile,
-  selectUnit,
   startCity,
   state,
   tileAt,
 } from '@/game/store'
 
+useGameClock()
 const mobile = useMobile()
 
 const cityOver = computed(() => state.phase === 'cityFallen' || state.phase === 'campaignOver')
-const inBattle = computed(() => state.phase === 'assign' || state.phase === 'event')
+const inBattle = computed(() => state.phase === 'battle' || state.phase === 'draft')
+const tileTargeting = computed(
+  () => state.phase === 'draft' && state.pendingCard?.target === 'tile',
+)
 
 const BOARD_WIDTHS: Record<number, number> = { 4: 600, 5: 690, 6: 760 }
 const boardWidth = computed(() => `${BOARD_WIDTHS[state.gridSize] ?? 600}px`)
@@ -43,16 +49,25 @@ const gridHighlight = computed(() => {
   switch (state.phase) {
     case 'setup':
       return state.selectedTileDefId ? 'empty' : 'filled'
-    case 'assign':
-      return state.selectedUnitId ? 'attacked' : null
+    case 'battle':
+      return 'attacked'
     case 'draft':
-      return state.pendingCard?.target === 'tile' ? 'alive' : null
+      return tileTargeting.value ? 'alive' : null
     default:
       return null
   }
 })
 
 const infoTileId = ref<string | null>(null)
+const { attackId: defendAttackId, attack: defendAttack } = useDefendModal()
+
+watch(
+  () => state.phase,
+  () => {
+    defendAttackId.value = null
+    infoTileId.value = null
+  },
+)
 
 /** Each click does its phase action if it has one, otherwise it shows the building info. */
 function onCellClick(cell: number) {
@@ -64,18 +79,13 @@ function onCellClick(cell: number) {
   }
   if (!tile) return
   const attack = attackOnTile(tile.id)
-  if (state.phase === 'assign' && attack && state.selectedUnitId) {
-    assignSelectedUnit(attack.id)
-  } else if (state.phase === 'draft' && state.pendingCard?.target === 'tile') {
+  if (state.phase === 'battle' && attack) {
+    defendAttackId.value = attack.id
+  } else if (tileTargeting.value) {
     chooseCardTarget(tile.id)
   } else {
     infoTileId.value = tile.id
   }
-}
-
-function onUnitClick(unitId: string) {
-  if (state.phase === 'assign') selectUnit(unitId)
-  else if (state.phase === 'draft' && state.pendingCard?.target === 'unit') chooseCardTarget(unitId)
 }
 </script>
 
@@ -93,26 +103,21 @@ function onUnitClick(unitId: string) {
       <div class="board">
         <CityGrid :highlight="gridHighlight" @cell-click="onCellClick" />
         <SetupHint v-if="state.phase === 'setup'" />
+        <div v-else-if="tileTargeting" class="panel targeting">
+          <p class="hint">{{ state.pendingCard?.name }}: click a standing tile.</p>
+          <button class="btn secondary" @click="cancelPendingCard">Cancel</button>
+        </div>
       </div>
 
       <div v-if="!cityOver" class="units">
         <UnitPicker v-if="state.phase === 'setup'" />
-        <UnitRoster
-          v-else
-          :targeting="state.phase === 'draft' && state.pendingCard?.target === 'unit'"
-          @unit-click="onUnitClick"
-        />
+        <UnitRoster v-else />
       </div>
 
       <aside class="side">
-        <button
-          v-if="inBattle"
-          class="btn"
-          :disabled="state.phase !== 'assign'"
-          @click="endTurn"
-        >
-          End turn
-        </button>
+        <section v-if="inBattle" class="panel">
+          <TimeControls />
+        </section>
 
         <BattleEventsPanel v-if="!cityOver" />
 
@@ -123,10 +128,8 @@ function onUnitClick(unitId: string) {
 
         <template v-else-if="inBattle">
           <TreasuryPanel />
-          <AttackPanel />
+          <AttackPanel @select="defendAttackId = $event" />
         </template>
-
-        <CardDraft v-else-if="state.phase === 'draft'" />
 
         <GameOver v-else />
 
@@ -137,7 +140,13 @@ function onUnitClick(unitId: string) {
     </div>
   </main>
 
+  <DefendModal
+    v-if="!mobile && defendAttack"
+    :attack="defendAttack"
+    @close="defendAttackId = null"
+  />
   <TileInfoModal v-if="!mobile && infoTileId" :tile-id="infoTileId" @close="infoTileId = null" />
+  <DraftModal />
   <EventModal />
 </template>
 
@@ -221,5 +230,17 @@ function onUnitClick(unitId: string) {
   display: flex;
   flex-direction: column;
   gap: $spacing * 2;
+}
+
+.targeting {
+  display: flex;
+  align-items: center;
+  gap: $spacing;
+  margin-top: $spacing * 2;
+
+  .hint {
+    flex: 1;
+    margin: 0;
+  }
 }
 </style>

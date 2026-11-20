@@ -15,7 +15,7 @@ describe('Refugee Caravan', () => {
     expect(isCaravan(house)).toBe(false)
   })
 
-  it('stores 1 gold per survived turn', () => {
+  it('stores 1 gold per survived day', () => {
     const tiles = build(['refugeeCaravan', 'house'])
     fillHoards(tiles)
     fillHoards(tiles)

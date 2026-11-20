@@ -15,7 +15,7 @@ import {
 } from '@/game/store'
 
 const battleEvent = computed(() => currentBattleEvent())
-const triggered = computed(() => (state.phase === 'event' ? currentEvent() : undefined))
+const triggered = computed(() => currentEvent())
 const impact = computed(() => (triggered.value ? eventImpact(triggered.value) : undefined))
 const event = computed(() => battleEvent.value ?? triggered.value?.event)
 </script>
@@ -48,6 +48,7 @@ const event = computed(() => battleEvent.value ?? triggered.value?.event)
           Absorbed by garrison: {{ impact.before.absorbedByGarrison }} ->
           {{ impact.after.absorbedByGarrison }}
         </div>
+        <div>Affects the whole fight.</div>
       </div>
 
       <div class="footer">

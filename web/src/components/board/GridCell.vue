@@ -7,7 +7,7 @@ import {
   cityReduction,
   escapeDamage,
   exposedSidesOf,
-  previewAttack,
+  remainingPreview,
   state,
   tileAt,
   unitsOnAttack,
@@ -28,7 +28,10 @@ const props = defineProps<{ cell: number; active: boolean }>()
 
 const tile = computed(() => tileAt(props.cell))
 const attack = computed(() => (tile.value ? attackOnTile(tile.value.id) : undefined))
-const threat = computed(() => (attack.value ? previewAttack(attack.value)?.tileDamage : 0))
+const threat = computed(() => (attack.value ? remainingPreview(attack.value)?.tileDamage : 0))
+const fightProgress = computed(() =>
+  attack.value?.status === 'fighting' ? (attack.value.elapsed / attack.value.duration) * 100 : null,
+)
 const defenders = computed(() => (attack.value ? unitsOnAttack(attack.value.id) : []))
 const reduction = computed(() =>
   tile.value && state.phase !== 'setup' ? cityReduction(tile.value) : 0,
@@ -77,7 +80,19 @@ const title = computed(
         </span>
       </span>
       <StatBar :value="tile.health" :max="tile.def.health" kind="health" :threat="threat" />
-      <span v-if="attack" class="attack-badge" :class="{ merged: attack.merged > 0 }">
+      <span
+        v-if="fightProgress !== null"
+        class="fight-bar"
+        :title="`Fight ${attack?.elapsed}/${attack?.duration} ticks`"
+      >
+        <span :style="{ width: `${fightProgress}%` }" />
+      </span>
+      <span
+        v-if="attack"
+        class="attack-badge"
+        :class="{ merged: attack.merged > 0, incoming: attack.status === 'incoming' }"
+      >
+        <template v-if="attack.status === 'incoming'">! </template>
         ATK {{ attack.strength }}
         <template v-if="attack.merged > 0"> x{{ attack.merged + 1 }}</template>
         <template v-if="attack.deep"> ½</template>
@@ -178,6 +193,26 @@ const title = computed(
       background: $color-danger;
       box-shadow: 0 0 8px $color-danger;
     }
+
+    &.incoming {
+      animation: incoming-pulse 1s ease-in-out infinite alternate;
+    }
+  }
+
+  .fight-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: rgb(0 0 0 / 50%);
+
+    span {
+      display: block;
+      height: 100%;
+      background: $color-attack;
+      transition: width 0.25s linear;
+    }
   }
 
   .defenders-badge {
@@ -216,6 +251,13 @@ const title = computed(
     margin: 0;
     font-size: 12px;
     font-weight: 700;
+  }
+}
+
+@keyframes incoming-pulse {
+  to {
+    box-shadow: 0 0 10px $color-attack;
+    transform: scale(1.08);
   }
 }
 

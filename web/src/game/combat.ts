@@ -20,11 +20,16 @@ export interface CombatResult {
   tileDamage: number
 }
 
+/** Units rushed into a running fight count with this fraction of their strength (rounded up). */
+export const RUSH_STRENGTH_FACTOR = 0.5
+
 export interface CombatModifiers {
   defenseBonus?: number
   ignoreDefense?: boolean
   /** Added to each defending unit's strength (floored at 0). */
   strengthBonus?: number
+  /** Unit ids rushed in after the fight started, see `RUSH_STRENGTH_FACTOR`. */
+  rushed?: string[]
 }
 
 /** Splits `total` between weights proportionally, rounding with largest remainders. */
@@ -106,9 +111,10 @@ export function resolveAttack(
   const blockedByTile = Math.min(effective, defense)
   let remaining = effective - blockedByTile
 
-  const strengths = units.map((u) =>
-    Math.max(0, unitStrength(u, units, ctx) + (mods.strengthBonus ?? 0)),
-  )
+  const strengths = units.map((u) => {
+    const strength = Math.max(0, unitStrength(u, units, ctx) + (mods.strengthBonus ?? 0))
+    return mods.rushed?.includes(u.id) ? Math.ceil(strength * RUSH_STRENGTH_FACTOR) : strength
+  })
   const totalStrength = strengths.reduce((sum, s) => sum + s, 0)
   const absorbedByGarrison = Math.min(remaining, totalStrength)
   remaining -= absorbedByGarrison

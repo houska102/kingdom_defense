@@ -1,5 +1,5 @@
-import { reactive, watch } from 'vue'
-import { exposedSides, generateAttacks } from './attacks'
+import { reactive, ref, watch } from 'vue'
+import { exposedSides, spawnAttack } from './attacks'
 import { PREVENT_BATTLE_EVENT_COST, battleTotal, describeBattleEffect } from './battleEvents'
 import {
   bonusRecruits,
@@ -32,12 +32,22 @@ import {
 import { EVENT_CHANCE, eventModifiers, goodEventChance, inspiringBonus, rollEvents } from './events'
 import { createRng, type Rng } from './rng'
 import { loadSave, writeSave } from './save'
+import {
+  ATTACK_TICKS,
+  DAY_TICKS,
+  ENDURANCE_REGEN_TICKS,
+  applyAbsorbed,
+  remainingPortion,
+  spawnCount,
+  tickPortion,
+} from './ticks'
 import type {
   Attack,
   BattleEffectKind,
   BattleEvent,
   Card,
   Direction,
+  GameEvent,
   GameState,
   Tile,
   TriggeredEvent,
@@ -49,6 +59,7 @@ const saved = loadSave()
 let rng: Rng = createRng(saved?.seed ?? Date.now())
 
 export const state = reactive<GameState>(saved?.state ?? newCampaign(rng))
+if (state.phase === 'battle') state.paused = true
 
 watch(state, () => writeSave(state, rng.seed()), { deep: true })
 
@@ -77,16 +88,23 @@ export function canPickUnit(def: UnitDef): boolean {
     ? state.gold >= pickedUpkeep() + upkeepOf(def)
     : pickedCount() < garrisonPicks()
 }
-export const totalTurns = () => state.cityResults.reduce((sum, r) => sum + r.turns, 0)
+export const totalDays = () => state.cityResults.reduce((sum, r) => sum + r.days, 0)
 
 export const tileAt = (cell: number) => state.tiles.find((t) => t.cell === cell)
 export const tileById = (id: string) => state.tiles.find((t) => t.id === id)
 export const unitById = (id: string) => state.units.find((u) => u.id === id)
 export const attackOnTile = (tileId: string) => state.attacks.find((a) => a.tileId === tileId)
+export const incomingAttacks = () => state.attacks.filter((a) => a.status === 'incoming')
 
 export function attackOfUnit(unitId: string): Attack | undefined {
   return state.attacks.find((a) => state.assignments[a.id]?.includes(unitId))
 }
+
+/** Units on a fight that already started can't be recalled or moved until it ends. */
+export const isUnitLocked = (unitId: string) => attackOfUnit(unitId)?.status === 'fighting'
+
+/** Sent into its fight after it started, so it fights at reduced strength. */
+export const isRushed = (unitId: string) => !!attackOfUnit(unitId)?.rushed?.includes(unitId)
 
 export function unitsOnAttack(attackId: string): Unit[] {
   return (state.assignments[attackId] ?? [])
@@ -116,7 +134,7 @@ export const caravanGold = () => caravanGoldOf(state.tiles)
 
 export function canHireMercenary(): boolean {
   const cost = mercenaryCost()
-  return state.phase === 'assign' && cost !== undefined && state.gold >= cost
+  return state.phase === 'battle' && cost !== undefined && state.gold >= cost
 }
 
 /** Sides from which the enemy can currently reach `tile`. Empty if it is shielded. */
@@ -128,33 +146,38 @@ function combatContext(tile: Tile): StrengthContext {
   return { exposedSides: exposedSidesOf(tile).length, fallenUnits: state.fallenUnits }
 }
 
-/** Combat outcome for an attack with the current assignments, ignoring events. */
-export function previewAttack(attack: Attack): CombatResult | undefined {
+/** Outcome of the whole fight with the current defenders, as if it dealt everything at once. */
+function resolveFight(attack: Attack, event?: GameEvent): CombatResult | undefined {
   const tile = tileById(attack.tileId)
   if (!tile) return undefined
-  return resolveAttack(
-    attack,
-    tile,
-    unitsOnAttack(attack.id),
-    cityReduction(tile),
-    {},
-    combatContext(tile),
-  )
-}
-
-function resolveWithEvent(attack: Attack, triggered?: TriggeredEvent): CombatResult | undefined {
-  if (!triggered) return previewAttack(attack)
-  const tile = tileById(attack.tileId)
-  if (!tile) return undefined
-  const outcome = eventModifiers(triggered.event, attack)
+  const outcome = event ? eventModifiers(event, attack) : { attack, mods: {} }
   return resolveAttack(
     outcome.attack,
     tile,
     unitsOnAttack(attack.id),
     cityReduction(tile),
-    outcome.mods,
+    { ...outcome.mods, rushed: attack.rushed },
     combatContext(tile),
   )
+}
+
+/** Whole-fight outcome for an attack with the current assignments and its event, if any. */
+export const previewAttack = (attack: Attack) => resolveFight(attack, attack.event)
+
+/** Like `previewAttack`, but tile and unit damage only count the fight ticks still to come. */
+export function remainingPreview(attack: Attack): CombatResult | undefined {
+  const full = previewAttack(attack)
+  if (!full) return undefined
+  const left = (total: number) => remainingPortion(total, attack.elapsed, attack.duration)
+  return {
+    ...full,
+    tileDamage: left(full.tileDamage),
+    unitDamage: full.unitDamage.map((d) => {
+      const absorbed = left(d.absorbed)
+      const enduranceLoss = Math.min(absorbed, unitById(d.unitId)?.endurance ?? 0)
+      return { unitId: d.unitId, absorbed, enduranceLoss, healthLoss: absorbed - enduranceLoss }
+    }),
+  }
 }
 
 export const currentEvent = (): TriggeredEvent | undefined => state.pendingEvents[state.eventIndex]
@@ -191,13 +214,13 @@ export interface EventImpact {
   after: CombatResult
 }
 
-/** Before/after view of how an event changes its attack. */
+/** Before/after view of how an event changes its fight. */
 export function eventImpact(triggered: TriggeredEvent): EventImpact | undefined {
   const attack = state.attacks.find((a) => a.id === triggered.attackId)
   const tile = attack && tileById(attack.tileId)
   if (!attack || !tile) return undefined
-  const before = previewAttack(attack)
-  const after = resolveWithEvent(attack, triggered)
+  const before = resolveFight(attack)
+  const after = resolveFight(attack, triggered.event)
   if (!before || !after) return undefined
   return {
     tile,
@@ -252,9 +275,13 @@ export function startCity() {
     ...bonusRecruits(state.tiles),
   ].map((def) => createUnit(state, def))
   state.selectedTileDefId = null
-  state.turn = 1
+  state.day = 1
+  state.tick = 0
+  state.paused = false
+  state.attacks = []
+  state.assignments = {}
   applyBattleEvents()
-  beginTurn()
+  state.phase = 'battle'
 }
 
 /** Applies the one-time effects of the battle events and the battle-long tile defense. */
@@ -284,56 +311,265 @@ function applyBattleEvents() {
   for (const tile of state.tiles) tile.bonusDefense = battleModifier('tileDefense')
 }
 
-// Turn actions
+// Time
 
-function beginTurn() {
-  state.attacks = generateAttacks(
-    state.turn,
-    state.tiles,
-    rng,
-    () => nextId(state, 'attack'),
-    state.attackDirection,
-    state.gridSize,
-    currentCity().attackBonus + battleModifier('attackBonus'),
-    battleModifier('extraAttacks'),
-  )
-  state.assignments = Object.fromEntries(state.attacks.map((a) => [a.id, []]))
-  state.selectedUnitId = null
-  state.phase = 'assign'
+const tickHolds = ref(0)
+
+/** Stops ticks until the returned release is called, e.g. while a modal is open. Not saved. */
+export function holdTicks(): () => void {
+  tickHolds.value++
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    tickHolds.value--
+  }
 }
 
-export function selectUnit(unitId: string | null) {
-  if (state.phase !== 'assign') return
-  state.selectedUnitId = state.selectedUnitId === unitId ? null : unitId
+/** Ticks run during the battle unless paused, held, or an event is waiting to be seen. */
+export const canTick = () =>
+  state.phase === 'battle' &&
+  !state.paused &&
+  tickHolds.value === 0 &&
+  state.pendingEvents.length === 0
+
+export function pause() {
+  if (state.phase === 'battle') state.paused = true
 }
+
+/** Starts every incoming fight with its current defenders and lets time run again. */
+export function resume() {
+  if (state.phase !== 'battle') return
+  startFights()
+  state.paused = false
+}
+
+export function togglePause() {
+  if (state.paused) resume()
+  else pause()
+}
+
+export function setSpeed(speed: number) {
+  state.speed = speed
+}
+
+/** One tick of the battle: fights deal their slice, idle units recover, attacks spawn, days end. */
+export function tick() {
+  if (!canTick()) return
+  state.tick++
+  fightTick()
+  if (state.phase !== 'battle') return
+  regenTick()
+  if (state.tick >= DAY_TICKS) endDay()
+  else spawnTick()
+}
+
+function startFights() {
+  const incoming = incomingAttacks()
+  if (incoming.length === 0) return
+  for (const attack of incoming) attack.status = 'fighting'
+  const defended = incoming.filter((a) => (state.assignments[a.id]?.length ?? 0) > 0)
+  const baseChance = goodEventChance(state.tiles) + battleModifier('goodEventChance')
+  const goodChance = (attack: Attack) =>
+    Math.min(1, Math.max(0, baseChance + inspiringBonus(unitsOnAttack(attack.id))))
+  const triggered = rollEvents(defended, rng, EVENT_CHANCE, goodChance)
+  for (const t of triggered) {
+    const attack = state.attacks.find((a) => a.id === t.attackId)
+    if (attack) attack.event = t.event
+  }
+  state.pendingEvents.push(...triggered)
+}
+
+/** Every running fight deals this tick's share of its whole-fight outcome. */
+function fightTick() {
+  const fighting = state.attacks.filter((a) => a.status === 'fighting')
+  for (const attack of fighting) {
+    const tile = tileById(attack.tileId)
+    const result = previewAttack(attack)
+    if (!tile || !result) continue
+    for (const d of result.unitDamage) {
+      const unit = unitById(d.unitId)
+      if (unit) applyAbsorbed(unit, tickPortion(d.absorbed, attack.elapsed, attack.duration))
+    }
+    const damage = Math.min(
+      tile.health,
+      tickPortion(result.tileDamage, attack.elapsed, attack.duration),
+    )
+    tile.health -= damage
+    attack.tileDamageDealt += damage
+    attack.elapsed++
+  }
+  removeFallenUnits()
+  for (const attack of fighting) {
+    const tile = tileById(attack.tileId)
+    if (!tile || tile.health === 0 || attack.elapsed >= attack.duration) endFight(attack)
+  }
+  checkCityFall()
+}
+
+function removeUnits(ids: Set<string>) {
+  state.units = state.units.filter((u) => !ids.has(u.id))
+  for (const attackId of Object.keys(state.assignments)) {
+    state.assignments[attackId] = state.assignments[attackId].filter((id) => !ids.has(id))
+  }
+}
+
+function removeFallenUnits() {
+  const fallen = state.units.filter((u) => u.health <= 0)
+  if (fallen.length === 0) return
+  for (const unit of fallen) logLine(`${unit.def.name} fell in battle.`)
+  state.fallenUnits += fallen.length
+  removeUnits(new Set(fallen.map((u) => u.id)))
+}
+
+/** Frees the defenders with their after-fight endurance and settles an escape order. */
+function endFight(attack: Attack) {
+  const tile = tileById(attack.tileId)
+  const cityRegen = passiveTotal(state.tiles, 'garrisonRegen')
+  for (const unit of unitsOnAttack(attack.id)) {
+    const unitRegen = unit.def.passive?.kind === 'enduranceRegen' ? unit.def.passive.amount : 0
+    unit.endurance = Math.min(
+      maxEndurance(unit, state.fallenUnits),
+      unit.endurance + 1 + unitRegen + cityRegen,
+    )
+  }
+  state.attacks = state.attacks.filter((a) => a.id !== attack.id)
+  delete state.assignments[attack.id]
+  if (!tile) return
+
+  const prefix = attack.event ? `[${attack.event.title}] ` : ''
+  if (tile.health === 0) {
+    logLine(`${prefix}${tile.def.name} was destroyed!`)
+  } else {
+    const outcome =
+      attack.tileDamageDealt > 0 ? `took ${attack.tileDamageDealt} damage` : 'the tile held'
+    logLine(`${prefix}Attack on ${tile.def.name} ended, ${outcome}.`)
+  }
+  if (!tile.escaping) return
+  const away = escapes(tile, { tileDamage: attack.tileDamageDealt })
+  delete tile.escaping
+  if (away) departTile(tile)
+  else logLine(`${tile.def.name} could not break away.`)
+}
+
+function regenTick() {
+  const elapsed = (state.day - 1) * DAY_TICKS + state.tick
+  if (elapsed % ENDURANCE_REGEN_TICKS !== 0) return
+  for (const unit of state.units) {
+    if (isUnitLocked(unit.id)) continue
+    unit.endurance = Math.min(maxEndurance(unit, state.fallenUnits), unit.endurance + 1)
+  }
+}
+
+/** New attacks pause the game so defenders can be sent before the fight starts. */
+function spawnTick() {
+  const count = spawnCount(state.day, state.gridSize, battleModifier('extraAttacks'), rng)
+  for (let i = 0; i < count; i++) {
+    const spawned = spawnAttack({
+      day: state.day,
+      tiles: state.tiles,
+      attacks: state.attacks,
+      rng,
+      makeId: () => nextId(state, 'attack'),
+      direction: state.attackDirection,
+      gridSize: state.gridSize,
+      duration: ATTACK_TICKS,
+      bonus: currentCity().attackBonus + battleModifier('attackBonus'),
+    })
+    if (!spawned) continue
+    const { attack, isNew } = spawned
+    const name = tileById(attack.tileId)?.def.name ?? '?'
+    if (isNew) {
+      state.attacks.push(attack)
+      state.assignments[attack.id] = []
+      const half = attack.deep ? ', half strength' : ''
+      logLine(`The enemy attacks ${name} (ATK ${attack.strength}${half}).`)
+    } else {
+      logLine(`More enemies join the attack on ${name} (ATK ${attack.strength}).`)
+    }
+    state.paused = true
+  }
+}
+
+function checkCityFall() {
+  const keepLost = state.tiles.some((t) => t.def.essential && t.health === 0)
+  const allLost = state.tiles.every((t) => t.health === 0)
+  if (!keepLost && !allLost) return
+  fallCity(keepLost ? 'The Keep was destroyed.' : 'Every tile was destroyed.')
+}
+
+/** Income, upkeep, healing and hoards, then the card draft. Running fights carry over. */
+function endDay() {
+  const income = goldIncome()
+  if (income > 0) {
+    state.gold += income
+    logLine(`The treasury gains ${income} gold (${state.gold} total).`)
+  }
+  const goldBeforeUpkeep = state.gold
+  const upkeep = payUpkeep(state.units, state.gold)
+  state.gold = upkeep.gold
+  if (state.gold < goldBeforeUpkeep) {
+    logLine(`Paid ${goldBeforeUpkeep - state.gold} gold upkeep (${state.gold} left).`)
+  }
+  for (const unit of upkeep.dismissed) logLine(`${unit.def.name} left, the pay ran out.`)
+  removeUnits(new Set(upkeep.dismissed.map((u) => u.id)))
+
+  const cityHeal = passiveTotal(state.tiles, 'garrisonHeal')
+  for (const unit of state.units) unit.health = Math.min(unit.def.health, unit.health + cityHeal)
+  fillHoards(state.tiles)
+
+  state.draft = rollDraft(state, rng, draftSize(state.tiles) + battleModifier('draftSize'))
+  state.pendingCard = null
+  state.phase = 'draft'
+}
+
+// Battle actions
 
 export function unassignUnit(unitId: string) {
-  if (state.phase !== 'assign') return
+  if (state.phase !== 'battle' || isUnitLocked(unitId)) return
   for (const attackId of Object.keys(state.assignments)) {
     state.assignments[attackId] = state.assignments[attackId].filter((id) => id !== unitId)
   }
 }
 
+/**
+ * Sends a unit to an attack, moving it from an incoming one. Running fights take reinforcements,
+ * rushed in at reduced strength.
+ */
 export function assignUnit(unitId: string, attackId: string) {
-  if (state.phase !== 'assign' || !unitById(unitId) || !state.assignments[attackId]) return
+  const attack = state.attacks.find((a) => a.id === attackId)
+  if (
+    state.phase !== 'battle' ||
+    !unitById(unitId) ||
+    !attack ||
+    !state.assignments[attackId] ||
+    isUnitLocked(unitId)
+  ) {
+    return
+  }
   unassignUnit(unitId)
   state.assignments[attackId].push(unitId)
-  state.selectedUnitId = null
+  if (attack.status === 'fighting') (attack.rushed ??= []).push(unitId)
 }
 
-export function assignSelectedUnit(attackId: string) {
-  if (state.selectedUnitId) assignUnit(state.selectedUnitId, attackId)
+export function acknowledgeEvent() {
+  if (!currentEvent()) return
+  state.eventIndex++
+  if (state.eventIndex >= state.pendingEvents.length) {
+    state.pendingEvents = []
+    state.eventIndex = 0
+  }
 }
 
 export function cancelPendingCard() {
   state.pendingCard = null
 }
 
-/** Adds a line to the current turn's battle log entry. */
+/** Adds a line to the current day's battle log entry. */
 function logLine(line: string) {
   const report = state.reports[0]
-  if (report?.turn === state.turn) report.lines.push(line)
-  else state.reports.unshift({ turn: state.turn, lines: [line] })
+  if (report?.day === state.day) report.lines.push(line)
+  else state.reports.unshift({ day: state.day, lines: [line] })
 }
 
 export function hireMercenary() {
@@ -346,12 +582,12 @@ export function hireMercenary() {
 }
 
 export const canEscape = (tile: Tile) =>
-  state.phase === 'assign' && tile.health > 0 && isEscape(tile)
+  state.phase === 'battle' && tile.health > 0 && isEscape(tile)
 
-/** Damage that would stop the tile from escaping this turn with the current defenders, ignoring events. */
+/** Tile damage that stops the tile from escaping its fight: dealt so far plus what is still to come. */
 export function escapeDamage(tile: Tile): number {
   const attack = attackOnTile(tile.id)
-  return attack ? (previewAttack(attack)?.tileDamage ?? 0) : 0
+  return attack ? attack.tileDamageDealt + (remainingPreview(attack)?.tileDamage ?? 0) : 0
 }
 
 /** Removes the tile from the city, its hoard is kept for the next city. */
@@ -366,7 +602,7 @@ function departTile(tile: Tile) {
   )
 }
 
-/** Unattacked tiles leave at once, attacked ones toggle an escape order for the turn's end. */
+/** Unattacked tiles leave at once, attacked ones toggle an escape order for the end of their fight. */
 export function escapeTile(tileId: string) {
   const tile = tileById(tileId)
   if (!tile || !canEscape(tile)) return
@@ -374,124 +610,15 @@ export function escapeTile(tileId: string) {
   else departTile(tile)
 }
 
-function describeResult(result: CombatResult, tile: Tile, attack: Attack): string {
-  const parts = [`${tile.def.name} hit for ${result.incoming}`]
-  if (attack.merged > 0) parts[0] += ` (${attack.merged + 1} attacks merged)`
-  if (result.reduction > 0) parts.push(`reduced by ${result.reduction}`)
-  if (result.blockedByTile > 0) parts.push(`defense blocked ${result.blockedByTile}`)
-  for (const d of result.unitDamage) {
-    const name = unitById(d.unitId)?.def.name ?? '?'
-    parts.push(`${name} absorbed ${d.absorbed} (-${d.enduranceLoss} end, -${d.healthLoss} hp)`)
-  }
-  parts.push(result.tileDamage > 0 ? `${tile.def.name} took ${result.tileDamage} damage` : 'tile held')
-  return parts.join(', ')
-}
-
-export function endTurn() {
-  if (state.phase !== 'assign') return
-  state.selectedUnitId = null
-  const defended = state.attacks.filter((a) => (state.assignments[a.id]?.length ?? 0) > 0)
-  const baseChance = goodEventChance(state.tiles) + battleModifier('goodEventChance')
-  const goodChance = (attack: Attack) =>
-    Math.min(1, Math.max(0, baseChance + inspiringBonus(unitsOnAttack(attack.id))))
-  state.pendingEvents = rollEvents(defended, rng, EVENT_CHANCE, goodChance)
-  state.eventIndex = 0
-  if (state.pendingEvents.length > 0) state.phase = 'event'
-  else applyResolution()
-}
-
-export function acknowledgeEvent() {
-  if (state.phase !== 'event') return
-  state.eventIndex++
-  if (state.eventIndex >= state.pendingEvents.length) applyResolution()
-}
-
-function applyResolution() {
-  const lines: string[] = []
-  const fought = new Set<string>()
-  const departing: Tile[] = []
-
-  const results = state.attacks.flatMap((attack) => {
-    const triggered = state.pendingEvents.find((e) => e.attackId === attack.id)
-    const result = resolveWithEvent(attack, triggered)
-    const tile = tileById(attack.tileId)
-    return result && tile ? [{ attack, tile, result, triggered }] : []
-  })
-
-  for (const { attack, tile, result, triggered } of results) {
-    const line = describeResult(result, tile, attack)
-    lines.push(triggered ? `[${triggered.event.title}] ${line}` : line)
-    for (const d of result.unitDamage) {
-      const unit = unitById(d.unitId)
-      if (!unit) continue
-      fought.add(unit.id)
-      unit.endurance -= d.enduranceLoss
-      unit.health = Math.max(0, unit.health - d.healthLoss)
-    }
-    tile.health = Math.max(0, tile.health - result.tileDamage)
-    if (tile.health === 0) lines.push(`${tile.def.name} was destroyed!`)
-    if (escapes(tile, result)) departing.push(tile)
-    else if (tile.escaping) lines.push(`${tile.def.name} could not break away.`)
-  }
-  for (const tile of state.tiles) delete tile.escaping
-
-  const fallen = state.units.filter((u) => u.health === 0)
-  for (const unit of fallen) lines.push(`${unit.def.name} fell in battle.`)
-  state.fallenUnits += fallen.length
-  state.units = state.units.filter((u) => u.health > 0)
-
-  const cityRegen = passiveTotal(state.tiles, 'garrisonRegen')
-  const cityHeal = passiveTotal(state.tiles, 'garrisonHeal')
-  const income = goldIncome()
-  if (income > 0) {
-    state.gold += income
-    lines.push(`The treasury gains ${income} gold (${state.gold} total).`)
-  }
-  const goldBeforeUpkeep = state.gold
-  const upkeep = payUpkeep(state.units, state.gold)
-  state.gold = upkeep.gold
-  if (state.gold < goldBeforeUpkeep) {
-    lines.push(`Paid ${goldBeforeUpkeep - state.gold} gold upkeep (${state.gold} left).`)
-  }
-  for (const unit of upkeep.dismissed) lines.push(`${unit.def.name} left, the pay ran out.`)
-  const dismissedIds = new Set(upkeep.dismissed.map((u) => u.id))
-  state.units = state.units.filter((u) => !dismissedIds.has(u.id))
-  for (const unit of state.units) {
-    unit.health = Math.min(unit.def.health, unit.health + cityHeal)
-    const cap = maxEndurance(unit, state.fallenUnits)
-    if (fought.has(unit.id)) {
-      const unitRegen = unit.def.passive?.kind === 'enduranceRegen' ? unit.def.passive.amount : 0
-      unit.endurance = Math.min(cap, unit.endurance + 1 + unitRegen + cityRegen)
-    } else {
-      unit.endurance = cap
-    }
-  }
-
-  for (const line of lines) logLine(line)
-  for (const tile of departing) departTile(tile)
-  state.attacks = []
-  state.assignments = {}
-  state.selectedUnitId = null
-  state.pendingEvents = []
-  state.eventIndex = 0
-
-  const keepLost = state.tiles.some((t) => t.def.essential && t.health === 0)
-  const allLost = state.tiles.every((t) => t.health === 0)
-  if (keepLost || allLost) {
-    fallCity(keepLost ? 'The Keep was destroyed.' : 'Every tile was destroyed.')
-    return
-  }
-  fillHoards(state.tiles)
-
-  state.draft = rollDraft(state, rng, draftSize(state.tiles) + battleModifier('draftSize'))
-  state.pendingCard = null
-  state.phase = 'draft'
-}
-
 function fallCity(reason: string) {
   state.fallReason = reason
-  state.cityResults.push({ name: currentCity().name, turns: state.turn - 1, fallReason: reason })
+  state.cityResults.push({ name: currentCity().name, days: state.day - 1, fallReason: reason })
   Object.assign(state, mergeUnlocks(state, state.unlocks))
+  state.attacks = []
+  state.assignments = {}
+  state.pendingEvents = []
+  state.eventIndex = 0
+  state.paused = false
   state.phase = isLastCity(state.cityIndex) ? 'campaignOver' : 'cityFallen'
 }
 
@@ -500,8 +627,9 @@ function fallCity(reason: string) {
 function endDraft() {
   state.draft = []
   state.pendingCard = null
-  state.turn++
-  beginTurn()
+  state.day++
+  state.tick = 0
+  state.phase = 'battle'
 }
 
 export function pickCard(card: Card) {

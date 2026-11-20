@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { CAMPAIGN_LENGTH } from '@/game/data'
-import { currentCity, nextCity, restart, state, totalTurns } from '@/game/store'
+import { currentCity, nextCity, restart, state, totalDays } from '@/game/store'
 </script>
 
 <template>
   <section v-if="state.phase === 'cityFallen'" class="panel game-over">
     <h2>{{ currentCity().name }} has fallen</h2>
     <p>{{ state.fallReason }}</p>
-    <p class="score">Turns survived: {{ state.turn - 1 }}</p>
+    <p class="score">Days survived: {{ state.day - 1 }}</p>
     <p v-if="state.escapedGold > 0">
       Refugees bring {{ state.escapedGold }} gold to the next city.
     </p>
@@ -28,12 +28,12 @@ import { currentCity, nextCity, restart, state, totalTurns } from '@/game/store'
       <tbody>
         <tr v-for="(result, i) in state.cityResults" :key="i">
           <td>{{ i + 1 }}. {{ result.name }}</td>
-          <td class="num">{{ result.turns }}</td>
+          <td class="num">{{ result.days }}</td>
         </tr>
       </tbody>
     </table>
-    <p class="score">Total turns survived: {{ totalTurns() }}</p>
-    <p class="score">Permanent points earned: {{ totalTurns() }}</p>
+    <p class="score">Total days survived: {{ totalDays() }}</p>
+    <p class="score">Permanent points earned: {{ totalDays() }}</p>
     <p class="muted">Permanent points can't be spent yet.</p>
     <button class="btn" @click="restart">New campaign</button>
   </section>

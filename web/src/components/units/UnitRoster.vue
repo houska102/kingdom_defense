@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { state } from '@/game/store'
 import UnitCard from './UnitCard.vue'
-
-defineProps<{ targeting: boolean }>()
-const emit = defineEmits<{ unitClick: [unitId: string] }>()
 </script>
 
 <template>
@@ -11,13 +8,7 @@ const emit = defineEmits<{ unitClick: [unitId: string] }>()
     <h2>Garrison</h2>
     <p v-if="state.units.length === 0" class="hint">Your whole garrison has fallen.</p>
     <div class="list">
-      <UnitCard
-        v-for="unit in state.units"
-        :key="unit.id"
-        :unit="unit"
-        :targeting="targeting"
-        @click="emit('unitClick', unit.id)"
-      />
+      <UnitCard v-for="unit in state.units" :key="unit.id" :unit="unit" :targeting="false" />
     </div>
   </section>
 </template>

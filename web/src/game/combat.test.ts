@@ -19,7 +19,16 @@ const unit = (id = 'unit', def = unitDef): Unit => ({
   health: def.health,
   endurance: def.endurance,
 })
-const attack = (strength: number): Attack => ({ id: 'a', tileId: tile.id, strength, merged: 0 })
+const attack = (strength: number): Attack => ({
+  id: 'a',
+  tileId: tile.id,
+  strength,
+  merged: 0,
+  status: 'fighting',
+  duration: 4,
+  elapsed: 0,
+  tileDamageDealt: 0,
+})
 
 describe('resolveAttack (Game_idea.txt examples)', () => {
   it('attack 2 is cancelled by tile defense alone', () => {
@@ -139,6 +148,36 @@ describe('resolveAttack with event modifiers', () => {
     const exhausted = resolveAttack(attack(20), tile, [strong, weak], 0, { strengthBonus: -1 })
     expect(exhausted.absorbedByGarrison).toBe(2)
     expect(exhausted.unitDamage.map((d) => d.absorbed)).toEqual([2, 0])
+  })
+})
+
+describe('resolveAttack with rushed reinforcements', () => {
+  it('rushed units count at half strength, rounded up', () => {
+    const rushed = unit('rushed', { ...unitDef, endurance: 5 })
+    const steady = unit('steady', { ...unitDef, endurance: 5 })
+    const r = resolveAttack(attack(20), tile, [rushed, steady], 0, { rushed: [rushed.id] })
+    expect(r.unitDamage.map((d) => d.absorbed)).toEqual([2, 3])
+    expect(r.absorbedByGarrison).toBe(5)
+    expect(r.tileDamage).toBe(13)
+  })
+
+  it('halves after the event strength bonus', () => {
+    const r = resolveAttack(attack(20), tile, [unit()], 0, { strengthBonus: 1, rushed: ['unit'] })
+    expect(r.absorbedByGarrison).toBe(2)
+  })
+
+  it('a rushed archer still reduces the attack in full', () => {
+    const archer = unit('archer', { ...unitDef, passive: { kind: 'attackReduction', amount: 1 } })
+    const r = resolveAttack(attack(10), tile, [archer], 0, { rushed: [archer.id] })
+    expect(r.reduction).toBe(1)
+    expect(r.absorbedByGarrison).toBe(2)
+  })
+
+  it('a rushed standard bearer still gives the full banner bonus', () => {
+    const bearer = unit('b', { ...unitDef, strength: 1, passive: { kind: 'banner', amount: 1 } })
+    const other = unit('o', { ...unitDef, endurance: 5 })
+    const r = resolveAttack(attack(20), tile, [bearer, other], 0, { rushed: [bearer.id] })
+    expect(r.unitDamage.map((d) => d.absorbed)).toEqual([1, 4])
   })
 })
 

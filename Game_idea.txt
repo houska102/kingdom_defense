@@ -14,10 +14,11 @@ Game loop:
     - layout the city tiles and choose your garrison
     - later cities might have some prebuild tiles
     - there is a tile limit set by the grid of the city
-4. city loop:
-    1. multiple attacks get initiaded to different tiles
+4. city loop (runs on ticks, see Ticks below):
+    1. every tick there is a chance an attack starts on a tile, the game pauses when it does
         - when there is less tiles than attacks some tiles will get much stronger attacks to indicate this
-    2. player chooses what garrison to send to what attack
+    2. player chooses what garrison to send to the attack, then resumes
+        - the fight lasts multiple ticks, the units sent are locked into it until it ends
     4. this will get the final attack and defense values:
         - attack: Enemy attack with possible reductions from whatever tile and garrison passives
         - defense: Tile defense + Garrison strength
@@ -28,7 +29,8 @@ Game loop:
                     - attack strength 5 - 2 gets canceled by defense, 3 by garrison strength so remove 2 endurance and 1 health
                     - attack strength 10 - 2 gets canceled by defense, 3 by garrison strength so remove 2 endurance and 1 health remaining 5 gets removed from tile health
                 - if there are more than 1 garisons in assigned to the tile the endurance and health gets substracted by their attack ratio
-    5. Make a choice
+            - the damage is dealt gradually, a share every tick of the fight
+    5. Make a choice at the end of every day
    ----- repat
 ---- repeat until all cities are destroyed
 -get pernament point to spend
@@ -39,10 +41,10 @@ Decisions made (first prototype - single city):
 - city grid grows over the campaign: 4x4 in the first third (cities 1-4), 5x5 in the second (5-7), 6x6 in the last (8-10)
     - prebuilt tiles are placed by x/y on that city's grid
 - default buildings: Keep, Wall x3, House x4, Watchtower x2, Barracks, Refugee Caravan
-    - Refugee Caravan (0 def, 2 HP): gathers 1 gold for each turn it survives (only turns the city survives count)
-        - Escape action (tile info modal), only during the assign phase
+    - Refugee Caravan (0 def, 2 HP): gathers 1 gold for each day it survives (only days the city survives count)
+        - Escape action (tile info modal), any time during the battle
             - not attacked: leaves at once, its cell becomes empty (can open a flank)
-            - attacked: leaves at the end of the turn only if the attack (events included) deals it no damage, otherwise it takes the hit and stays
+            - attacked: leaves when the fight ends only if the whole fight (events included) deals it no damage, otherwise it takes the hit and stays
         - escaped gold is added to the treasury when the next city starts
         - the gold is lost if the caravan is destroyed or the city falls before it escapes
 - tile info modal: clicking a tile opens its building info when the click has no other action
@@ -53,17 +55,53 @@ Decisions made (first prototype - single city):
     - each unit has strength, health, endurance and maybe a passive
 - combat order: passives reduce attack -> tile defense -> garrison strength -> tile health
     - multiple garrisons on one attack split the absorbed damage by strength ratio (rounded to whole numbers)
-- attacks per turn: 2 + turn/2 (rounded down), never more than the grid width (4x4 = 4, 5x5 = 5, 6x6 = 6)
-    - after turn 10 every turn adds +1 attack on top of the grid cap (turn 11 +1, turn 12 +2, ...)
-- attack strength grows every turn (~3 + turn*1.5 with random spread) so destruction can't be stalled forever
-- attacks target living tiles from the enemy side (see attack direction below), extra attacks merge onto already attacked tiles (marked as stronger)
-- garrison that rested this turn gets full endurance back, garrison that fought gets 1 back
-- garrison at 0 health dies, tile at 0 health is destroyed
-- city falls when the Keep is destroyed or no tiles are left
-- "Make a choice" = pick 1 of 3 cards each turn
+- attacks per day: 1.5x (2 + day/2 (rounded down), never more than the grid width (4x4 = 4, 5x5 = 5, 6x6 = 6))
+    - after day 10 every day adds +1 to the part in brackets on top of the grid cap (day 11 +1, day 12 +2, ...)
+    - spread over the day as a chance per tick (attacks per day / 20)
+- attack strength grows every day (~3 + day*1.5 with random spread) so destruction can't be stalled forever
+- attacks target living tiles from the enemy side (see attack direction below), at most 1 running attack per tile
+    - when every tile is already under attack, the new attack merges onto a running one (marked as stronger)
+- garrison that fought gets 1 endurance back when its fight ends (+ Veterans / Wardens / Barracks bonuses)
+- garrison that isn't fighting regains 1 endurance every 3 ticks
+- garrison at 0 health dies at once, tile at 0 health is destroyed and its fight ends
+- city falls when the Keep is destroyed or no tiles are left (checked every tick)
+- "Make a choice" = pick 1 of 3 cards at the end of each day
+    - shown as a popup that cant be closed, pick a card or skip
     - now cards: repair tile, rest garrison, recruit garrison, fortify tile (+1 defense permanently), tribute (+1-3 gold)
     - next city cards: unlock a new tile or garrison type for all later cities
-- score for now = turns survived
+- score for now = days survived
+
+Ticks:
+
+- the battle runs in real time, 1 tick per second at 1x (2x and 4x speed available)
+    - pause / resume button, space toggles it on desktop, a hidden tab pauses the game
+- ticks only run during the battle, while not paused and no event or Defend modal is open
+    - closing the Defend modal lets time continue, unless the game was paused (for example by a new attack)
+- 20 ticks make a day, the day replaces the old turn
+- each tick in order:
+    1. every running fight deals its share of damage
+    2. units at 0 health die, fights that are over (or whose tile fell) end and free their defenders
+    3. the city fall check
+    4. idle units regain endurance (every 3 ticks)
+    5. the last tick of the day ends the day, any other tick can spawn attacks
+- new attack:
+    - arrives as incoming and pauses the game, the Defend modal opens for it
+    - defenders can be sent and moved freely while it is incoming
+    - resuming starts every incoming fight with the defenders it has
+- fight:
+    - lasts 4 ticks
+    - every tick computes the whole fight with the current defenders (same combat order as above) and deals that tick's share
+        - shares are spread evenly, they add up exactly to the whole fight when the defenders don't change
+        - each unit's share comes off endurance first, then health
+    - defenders are locked until it ends, free units can still be rushed in as reinforcements
+        - rushed in units fight at half strength (rounded up) for the rest of that fight, marked with ½
+        - only their own strength is halved (passives included), attack reduction and Banner stay full
+        - units sent while the attack is still incoming fight at full strength
+    - a defender that dies drops out, the remaining ticks hit the others or the tile
+- end of the day:
+    - gold income, upkeep, Infirmary heal, caravan hoards
+    - then the card draft popup (the game waits), afterwards the next day starts
+    - running fights carry over into the next day
 
 Attack direction:
 
@@ -78,19 +116,19 @@ Attack direction:
     - any tile next to such a cell is exposed from that side and counts as front line (rank 0)
     - the red marker shows on every exposed side of the tile
     - holes fully enclosed by standing tiles dont expose anything
-- attacks hit the front line first, if there are more attacks than front line tiles the rest go to rank 1, then rank 2...
+- attacks hit a random front line tile first, once every front line tile is already under attack the next goes to rank 1, then rank 2...
     - attacks on deeper ranks (rank 1+) are half strength (rounded up), marked with ½
-        - NOTE: with attacks capped at the grid width this only happens after turn 10 (or with Second Army)
+        - NOTE: this only happens when many fights run at once (late days or Second Army)
     - when front tiles get destroyed the next ones become the front line, so the city gets eaten from that side
-- merging only happens when there are more attacks than standing tiles in the whole city
+- merging only happens when every standing tile in the whole city is already under attack
 
 Events:
 
-- 20% chance per attack to trigger an event, rolled after pressing End turn (player cant react to them)
+- 20% chance per attack to trigger an event, rolled when its fight starts (on resume, after the defenders are chosen)
     - only attacks with at least 1 assigned defender can get an event
 - 70% of events are good, 30% bad
-- events pop up as a modal one by one with some spice text and before -> after numbers, then the turn resolves
-- each event only affects its own attack
+- events pop up as a modal one by one with some spice text and before -> after numbers, ticks wait until they are seen
+- each event only affects its own attack, for the whole fight
 - bad events:
     - Siege Ladders - attack +3
     - Berserker Charge - attack x1.5 (rounded up)
@@ -120,7 +158,7 @@ Battle events:
 - bad:
     - Veteran Horde - every attack +1
     - Rotten Timber - every tile -1 defense (never below 0)
-    - Second Army - +1 attack every turn, on top of the grid width cap
+    - Second Army - +1 attack every day, on top of the grid width cap
     - Desertion - -1 garrison pick
     - Ill Omens - per-attack events -20% good chance
     - Camp Fever - every unit starts with -1 HP (never below 1)
@@ -149,12 +187,12 @@ Campaign (10 cities):
         - still blocks the lane, so tiles behind it stay shielded
         - if nothing else can be attacked it gets attacked anyway
     - Mercenary Camp (1 def, 4 HP): two passives
-        - gold income: +1 gold at the end of each turn
-        - mercenary hire: spend 3 gold during the assign phase to hire a random unit (locked ones included)
-    - Granary (2 def, 5 HP): if it survives the turn, the card pick shows 4 options instead of 3
+        - gold income: +1 gold at the end of each day
+        - mercenary hire: spend 3 gold any time during the battle to hire a random unit (locked ones included)
+    - Granary (2 def, 5 HP): if it survives the day, the card pick shows 4 options instead of 3
     - Militia Center (2 def, 4 HP): at the start of the defense adds 1 Militia to the garrison for each standing House
         - recruits dont count against the garrison picks
-    - Infirmary (1 def, 4 HP): while standing all garrison heals 1 HP at the end of each turn
+    - Infirmary (1 def, 4 HP): while standing all garrison heals 1 HP at the end of each day
     - unique tiles (Infirmary, Militia Center, Chapel, Last Bastion, Mercenary Camp, Granary) can only be unlocked once, max 1 in the palette
         - once unlocked (or picked earlier in the same city) they stop being offered
 - unlockable units: Crossbowmen, Paladins, Longbowmen, Wardens, Captain, Barbarian Berserkers, Skirmishers, Warlord, Standard Bearer
@@ -171,7 +209,7 @@ Campaign (10 cities):
     - Sellswords (6 str, 5 HP, 3 end) - Paid Blade:
         - free pick, doesnt use a garrison pick slot
         - can only be picked with at least 1 gold (so never in the first city)
-        - costs 1 gold at the end of each turn (after income), leaves when the treasury cant pay
+        - costs 1 gold at the end of each day (after income), leaves when the treasury cant pay
         - can also come from mercenary hire, recruit cards and Wandering Sellswords, same upkeep
     - Skirmishers (2 str, 3 HP, 3 end) - Flanker: +2 strength when the defended tile is exposed from more than one side
     - Warlord (4 str, 5 HP, 2 end) - Bloodlust: +1 strength and +1 max endurance for each unit that died in this city
@@ -180,5 +218,5 @@ Campaign (10 cities):
     - campaign-wide treasury, starts at 0 and carries over between cities
     - earned from tile passives (Mercenary Camp, Refugee Caravan) and the Tribute card
     - spent on mercenaries for now, meant as a general currency for future uses (shops, upgrades, ...)
-- end of campaign: turns survived per city, total turns and permanent points
-    - permanent points = total turns, not spendable yet
+- end of campaign: days survived per city, total days and permanent points
+    - permanent points = total days, not spendable yet

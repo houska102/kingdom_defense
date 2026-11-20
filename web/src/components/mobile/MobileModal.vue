@@ -1,11 +1,14 @@
 <script setup lang="ts">
-withDefaults(defineProps<{ title?: string; closable?: boolean }>(), { closable: true })
+withDefaults(
+  defineProps<{ title?: string; closable?: boolean; wide?: boolean; centered?: boolean }>(),
+  { closable: true },
+)
 const emit = defineEmits<{ close: [] }>()
 </script>
 
 <template>
-  <div class="backdrop" @click.self="closable && emit('close')">
-    <div class="modal" role="dialog">
+  <div class="backdrop" :class="{ wide, centered }" @click.self="closable && emit('close')">
+    <div class="modal" :class="{ wide }" role="dialog">
       <header v-if="title || closable">
         <h2>{{ title }}</h2>
         <button v-if="closable" class="close" aria-label="Close" @click="emit('close')">x</button>
@@ -33,6 +36,17 @@ const emit = defineEmits<{ close: [] }>()
   justify-content: center;
   padding: $spacing;
   background: rgba(0, 0, 0, 0.6);
+
+  @media (min-width: 901px) {
+    &.wide {
+      align-items: flex-start;
+      padding-top: 6vh;
+    }
+
+    &.centered {
+      align-items: center;
+    }
+  }
 }
 
 .modal {
@@ -43,6 +57,13 @@ const emit = defineEmits<{ close: [] }>()
   border: 2px solid $color-border;
   border-radius: $radius;
   background: $color-surface;
+
+  /* Desktop only: wider, centered, for two-column content. */
+  @media (min-width: 901px) {
+    &.wide {
+      width: min(100%, 1000px);
+    }
+  }
 }
 
 header {

@@ -6,8 +6,8 @@ import { state } from '@/game/store'
   <section v-if="state.reports.length" class="panel">
     <h2>Battle log</h2>
     <div class="reports">
-      <div v-for="report in state.reports" :key="report.turn" class="report">
-        <h3>Turn {{ report.turn }}</h3>
+      <div v-for="report in state.reports" :key="report.day" class="report">
+        <h3>Day {{ report.day }}</h3>
         <ul>
           <li v-for="(line, i) in report.lines" :key="i">{{ line }}</li>
         </ul>

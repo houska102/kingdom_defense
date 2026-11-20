@@ -2,17 +2,18 @@
 import { computed, ref, watch } from 'vue'
 import CityGrid from '@/components/board/CityGrid.vue'
 import GameHeader from '@/components/layout/GameHeader.vue'
+import TimeControls from '@/components/layout/TimeControls.vue'
 import BattleEventsPanel from '@/components/panels/BattleEventsPanel.vue'
 import GameOver from '@/components/panels/GameOver.vue'
 import TreasuryPanel from '@/components/panels/TreasuryPanel.vue'
 import TurnLog from '@/components/panels/TurnLog.vue'
 import UnlocksPanel from '@/components/panels/UnlocksPanel.vue'
+import { useDefendModal } from '@/composables/useDefendModal'
 import {
   attackOnTile,
   cancelPendingCard,
   caravanGold,
   chooseCardTarget,
-  endTurn,
   mercenaryCost,
   state,
   tileAt,
@@ -20,7 +21,6 @@ import {
 import TileInfoModal from '@/components/modals/TileInfoModal.vue'
 import BuildModal from './BuildModal.vue'
 import DefendModal from './DefendModal.vue'
-import DraftModal from './DraftModal.vue'
 import GarrisonModal from './GarrisonModal.vue'
 import MobileModal from './MobileModal.vue'
 
@@ -28,7 +28,7 @@ type InfoPanel = 'omens' | 'treasury' | 'log' | 'unlocks'
 
 const setupStep = ref<'build' | 'garrison'>('build')
 const buildCell = ref<number | null>(null)
-const defendAttackId = ref<string | null>(null)
+const { attackId: defendAttackId, attack: defendAttack } = useDefendModal()
 const infoPanel = ref<InfoPanel | null>(null)
 const infoTileId = ref<string | null>(null)
 
@@ -47,13 +47,6 @@ const keepPlaced = computed(() => state.tiles.some((t) => t.def.essential))
 const tileTargeting = computed(
   () => state.phase === 'draft' && state.pendingCard?.target === 'tile',
 )
-const defendAttack = computed(() =>
-  state.phase === 'assign' ? state.attacks.find((a) => a.id === defendAttackId.value) : undefined,
-)
-const defendedCount = computed(
-  () => state.attacks.filter((a) => (state.assignments[a.id]?.length ?? 0) > 0).length,
-)
-
 const infoButtons = computed(() =>
   (
     [
@@ -73,7 +66,7 @@ const infoButtons = computed(() =>
 )
 
 const gridHighlight = computed(() => {
-  if (state.phase === 'assign') return 'attacked'
+  if (state.phase === 'battle') return 'attacked'
   if (tileTargeting.value) return 'alive'
   return null
 })
@@ -86,7 +79,7 @@ function onCellClick(cell: number) {
   }
   if (!tile) return
   const attack = attackOnTile(tile.id)
-  if (state.phase === 'assign' && attack) defendAttackId.value = attack.id
+  if (state.phase === 'battle' && attack) defendAttackId.value = attack.id
   else if (tileTargeting.value) chooseCardTarget(tile.id)
   else infoTileId.value = tile.id
 }
@@ -120,13 +113,7 @@ function onCellClick(cell: number) {
         </button>
       </template>
 
-      <template v-else-if="state.phase === 'assign' || state.phase === 'event'">
-        <p class="hint">
-          Tap an attacked tile to send defenders. {{ defendedCount }}/{{ state.attacks.length }}
-          defended.
-        </p>
-        <button class="btn" :disabled="state.phase !== 'assign'" @click="endTurn">End turn</button>
-      </template>
+      <TimeControls v-else-if="state.phase === 'battle'" />
 
       <template v-else-if="tileTargeting">
         <p class="hint">{{ state.pendingCard?.name }}: tap a standing tile.</p>
@@ -144,8 +131,6 @@ function onCellClick(cell: number) {
     <DefendModal v-if="defendAttack" :attack="defendAttack" @close="defendAttackId = null" />
 
     <TileInfoModal v-if="infoTileId" :tile-id="infoTileId" @close="infoTileId = null" />
-
-    <DraftModal v-if="state.phase === 'draft' && !tileTargeting" />
 
     <MobileModal v-if="cityOver" :closable="false">
       <GameOver />
