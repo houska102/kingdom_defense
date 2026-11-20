@@ -10,7 +10,7 @@ export const DAY_TICKS = 20
 /** Ticks a fight lasts once it starts. */
 export const ATTACK_TICKS = 4
 /** Idle units regain 1 endurance every this many ticks. */
-export const ENDURANCE_REGEN_TICKS = 3
+export const ENDURANCE_REGEN_TICKS = 5
 /** A day sees this many times `attackCount` attacks. */
 export const ATTACKS_PER_DAY_FACTOR = 1.5
 
